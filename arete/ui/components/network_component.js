@@ -66,12 +66,12 @@ class Web {
         <div class="nw-legend"></div>
       </div>
       <div class="nw-stage">
-        <svg class="nw-svg"><g class="nw-world"><g class="nw-edges"></g><g class="nw-nodes"></g></g></svg>
+        <svg class="nw-svg" role="group" aria-label="Your network: Tab to each person or group, Enter for details"><g class="nw-world"><g class="nw-edges"></g><g class="nw-nodes"></g></g></svg>
         <div class="nw-empty" hidden>
           <b>No one here yet.</b><br>Tell Arete about someone, e.g.
           <i>"Add Sam, a friend from uni who works at a bank, and Alex, who knows Sam from football."</i>
         </div>
-        <div class="nw-card" hidden></div>
+        <div class="nw-card" hidden role="region" aria-live="polite" aria-label="Details"></div>
         <div class="nw-zoom">
           <button data-zoom="1.25" title="Zoom in">+</button>
           <button data-zoom="0.8" title="Zoom out">−</button>
@@ -203,11 +203,14 @@ class Web {
     const hubs = [...this.parent.keys()].filter((id) => this.isHub(id));
     const hubSvg = (id) => {
       const g = this.groups.get(id.slice(HUB.length));
-      return `<g class="nw-node hub${g.parent_id ? " sub" : ""}" data-id="${esc(id)}">
+      const count = this.count.get(g.id) || 0;
+      return `<g class="nw-node hub${g.parent_id ? " sub" : ""}" data-id="${esc(id)}" tabindex="0" role="button"
+        aria-label="Group ${esc(g.name)}, ${count} ${count === 1 ? "person" : "people"}">
         <circle r="${this.radius(id)}" style="fill:${esc(g.colour)};stroke:${esc(g.colour)}"></circle>
         <text dy="4">${esc(g.name)}</text></g>`;
     };
-    const personSvg = (p) => `<g class="nw-node person" data-id="${esc(p.id)}">
+    const personSvg = (p) => `<g class="nw-node person" data-id="${esc(p.id)}" tabindex="0" role="button"
+        aria-label="${esc(p.name)}${p.worksFor ? `, works for ${esc(p.worksFor)}` : ""}">
         <circle r="${this.radius(p.id)}" fill="${esc(this.colour(p.id))}"></circle>
         <text dy="${this.radius(p.id) + 14}">${esc(p.name)}</text></g>`;
     this.nodesEl.innerHTML =
@@ -484,6 +487,18 @@ class Web {
       if (pr.moved) { this.saveView(); this.savePositions(); return; }
       if (pr.id && pr.id !== ME) this.choose(pr.id === this.selected ? null : pr.id);
       else if (this.selected) this.choose(null);
+    });
+
+    // Keyboard: Tab between people and groups, Enter or Space opens their card, Esc closes it.
+    this.svg.addEventListener("keydown", (e) => {
+      const g = e.target.closest && e.target.closest(".nw-node");
+      if (!g || g.dataset.id === ME) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        this.choose(g.dataset.id === this.selected ? null : g.dataset.id);
+      } else if (e.key === "Escape" && this.selected) {
+        this.choose(null);
+      }
     });
 
     this.svg.addEventListener("wheel", (e) => {

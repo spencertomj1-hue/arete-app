@@ -62,18 +62,18 @@ class ChatBar {
         <div class="cb-panel">
           <div class="cb-head">
             <span>Arete</span>
-            <button class="cb-close" title="Hide chat">${ICONS.chevron}</button>
+            <button class="cb-close" title="Hide chat" aria-label="Hide chat">${ICONS.chevron}</button>
           </div>
-          <div class="cb-log"></div>
+          <div class="cb-log" role="log" aria-live="polite" aria-label="Chat history"></div>
         </div>
-        <div class="cb-error"></div>
+        <div class="cb-error" role="alert"></div>
         <div class="cb-bar">
-          <button class="cb-toggle" title="Show chat history">${ICONS.chevron}</button>
-          <textarea rows="1" placeholder="Ask Arete..."></textarea>
-          <button class="cb-mic" title="Speak">${ICONS.mic}</button>
-          <button class="cb-send" title="Send">${ICONS.send}</button>
+          <button class="cb-toggle" title="Show chat history" aria-label="Show chat history">${ICONS.chevron}</button>
+          <textarea rows="1" placeholder="Ask Arete..." aria-label="Message to Arete (Enter sends, Shift+Enter for a new line)"></textarea>
+          <button class="cb-mic" title="Speak" aria-label="Speak (record a message)">${ICONS.mic}</button>
+          <button class="cb-send" title="Send" aria-label="Send">${ICONS.send}</button>
         </div>
-        <div class="cb-latest"></div>
+        <div class="cb-latest" aria-live="polite" aria-label="Latest reply"></div>
       </div>`;
     const $ = (s) => this.root.querySelector(s);
     this.dock = $(".cb-dock");

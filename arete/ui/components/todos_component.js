@@ -108,12 +108,17 @@ class GoalLists {
     this.expanded = new Set();   // sections showing all their to-dos, not just the first few
     this.drag = null;
     this.onOutside = (e) => { if (this.menu && !e.composedPath().includes(this.menu)) this.closeMenu(); };
-    this.onKey = (e) => { if (e.key === "Escape") this.closeMenu(); };
+    this.onKey = (e) => {
+      if (e.key !== "Escape" || !this.menu) return;
+      this.closeMenu();
+      if (this.menuFrom) this.menuFrom.focus();       // back to the to-do the menu was opened from
+    };
     this.onPress = () => { this.pressed = true; };
     this.onRelease = () => { setTimeout(() => { this.pressed = false; }, 0); };
     root.addEventListener("click", (e) => this.onClick(e));
     root.addEventListener("contextmenu", (e) => this.onContextMenu(e));
     root.addEventListener("pointerdown", (e) => this.onPointerDown(e));
+    root.addEventListener("keydown", (e) => this.onKeyDown(e));
   }
 
   // ---------- Data ----------
@@ -203,11 +208,22 @@ class GoalLists {
 
   render() {
     const { sections } = this.data;
+    // Redrawing replaces every row, so note which to-do (and which part of it) has
+    // keyboard focus, and put it back afterwards: keyboard users don't lose their place.
+    const had = this.root.getRootNode().activeElement;
+    const row = had && this.root.contains(had) && had.closest(".gl-row");
+    const keep = this.refocus ? { id: this.refocus, part: "[data-title]" }
+      : row ? { id: row.dataset.id, part: had.matches("[data-tick]") ? "[data-tick]" : "[data-title]" } : null;
+    this.refocus = null;
     this.rendering = true;
     this.root.innerHTML = `<div class="gl-grid compact">
       ${sections.map((s) => this.sectionHtml(s)).join("")}</div>`;
     this.rendering = false;
     this.restoreEditor();
+    if (keep && !this.editing) {
+      const el = this.root.querySelector(`.gl-row[data-id="${CSS.escape(keep.id)}"] ${keep.part}`);
+      if (el) el.focus();
+    }
   }
 
   sectionHtml(sec) {
@@ -225,7 +241,7 @@ class GoalLists {
         <span class="gl-count">${finished}/${all.length}</span>
         <span class="gl-sub">${esc(sec.title)}</span>
       </header>
-      <ul class="gl-list" data-list="${sec.period}">${shown.map((g) => this.rowHtml(g)).join("")}</ul>
+      <ul class="gl-list" data-list="${sec.period}" aria-label="${NAMES[sec.period]} to-dos">${shown.map((g) => this.rowHtml(g)).join("")}</ul>
       ${hidden > 0 ? `<button class="gl-link gl-more" data-more>${hidden} more</button>` : ""}
       ${adding ? `<div class="gl-add editing"><span class="gl-tick ghost"></span>
           <input class="gl-input" data-editor placeholder="New to-do" aria-label="New to-do"></div>`
@@ -241,15 +257,16 @@ class GoalLists {
     const state = this.completing.get(g.id);
     const title = ed === "title"
       ? `<input class="gl-input" data-editor aria-label="To-do title">`
-      : `<span class="gl-title" data-title>${esc(g.title)}</span>`;
+      : `<span class="gl-title" data-title tabindex="0" role="button"
+          title="Enter to edit · Menu key for options · Alt+↑/↓ to move">${esc(g.title)}${g.done ? '<span class="sr"> (done)</span>' : ""}</span>`;
     const notes = ed === "notes"
       ? `<input class="gl-input gl-notes-input" data-editor placeholder="Notes" aria-label="Notes">`
       : g.notes ? `<span class="gl-notes">${esc(g.notes)}</span>` : "";
     return `<li class="gl-row${g.done ? " done" : ""}${state ? ` ${state}` : ""}" data-id="${esc(g.id)}">
       <button class="gl-tick" data-tick role="checkbox" aria-checked="${g.done}"
-        aria-label="${g.done ? "Mark as not done" : "Mark as done"}">${ICONS.check}</button>
+        aria-label="${esc(g.title)}: ${g.done ? "mark as not done" : "mark as done"}">${ICONS.check}</button>
       <div class="gl-text">${title}${notes}</div>
-      ${g.repeat ? `<span class="gl-repeat" title="Repeats every ${UNITS[g.period]}">${ICONS.repeat}</span>` : ""}
+      ${g.repeat ? `<span class="gl-repeat" title="Repeats every ${UNITS[g.period]}" role="img" aria-label="Repeats every ${UNITS[g.period]}">${ICONS.repeat}</span>` : ""}
     </li>`;
   }
 
@@ -354,6 +371,43 @@ class GoalLists {
 
   // ---------- Right-click menu ----------
 
+  // Keyboard: Enter on a title edits it, the Menu key (or Shift+F10) opens the
+  // to-do's menu, and Alt+Up / Alt+Down move it within its list.
+  onKeyDown(e) {
+    if (this.menu && ["ArrowDown", "ArrowUp"].includes(e.key) && this.menu.contains(e.composedPath()[0])) {
+      const items = [...this.menu.querySelectorAll("button")];
+      const at = items.indexOf(e.composedPath()[0]);
+      items[(at + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+      e.preventDefault();
+      return;
+    }
+    const title = e.target.closest && e.target.closest("[data-title]");
+    const row = e.target.closest && e.target.closest(".gl-row");
+    if (!row || e.target.closest("input")) return;
+    if (title && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      this.startEdit({ kind: "title", id: row.dataset.id });
+    } else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+      e.preventDefault();
+      const r = row.getBoundingClientRect();
+      this.menuFrom = title || e.target;
+      this.onContextMenu({ target: row, clientX: r.left + 30, clientY: r.bottom, preventDefault() {} });
+      if (this.menu) this.menu.querySelector("button").focus();
+    } else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      e.preventDefault();
+      const list = row.parentElement;
+      if (list.classList.contains("gl-done-list")) return;
+      const sec = this.section(list.dataset.list);
+      const { active, done } = this.split(sec);
+      const ids = active.map((g) => g.id);
+      const from = ids.indexOf(row.dataset.id), to = from + (e.key === "ArrowUp" ? -1 : 1);
+      if (from < 0 || to < 0 || to >= ids.length) return;
+      ids.splice(to, 0, ids.splice(from, 1)[0]);
+      this.refocus = row.dataset.id;
+      this.commit([{ opId: uid(), kind: "reorder", ids: [...ids, ...done.map((g) => g.id)] }]);
+    }
+  }
+
   onContextMenu(e) {
     const row = e.target.closest(".gl-row");
     if (!row) return;
@@ -390,6 +444,9 @@ class GoalLists {
       else if (act === "move") this.commit([{ opId: uid(), kind: "move", id: g.id, period: b.dataset.to }]);
       else if (act === "delete") this.commit([{ opId: uid(), kind: "delete", id: g.id }]);
     });
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("aria-label", `Options for ${g.title}`);
+    menu.querySelectorAll("button").forEach((b) => b.setAttribute("role", "menuitem"));
     this.menu = menu;
   }
 

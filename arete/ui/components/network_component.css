@@ -192,3 +192,9 @@ button { cursor: pointer; }
 }
 .nw-actions button:hover { background: var(--soft); }
 .nw-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ---------- Accessibility ---------- */
+
+.nw-node:focus { outline: none; }
+.nw-node:focus-visible circle { stroke: var(--accent); stroke-width: 4; }
+.nw-root button:focus-visible, .nw-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

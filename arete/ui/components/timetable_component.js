@@ -99,7 +99,12 @@ class Timetable {
     this.swipeLocked = false;
     this.onMouseUp = () => this.endDrag();
     this.onWindowResize = () => this.fitToWindow();
-    this.onKey = (e) => { if (e.key === "Escape") { this.cancelDrag(); this.closePopover(); } };
+    this.onKey = (e) => {
+      if (e.key !== "Escape") return;
+      this.cancelDrag();
+      this.closePopover();
+      if (this.returnFocus) { this.returnFocus.focus(); this.returnFocus = null; }
+    };
     this.onOutside = (e) => {
       if (this.popover && !e.composedPath().includes(this.popover) && !e.composedPath().includes(this.wrapEl)) this.closePopover();
     };
@@ -293,7 +298,7 @@ class Timetable {
       <div class="tt-legend">${key}</div>
       <div class="tt-card">
         <div class="tt-wrap">
-          <table class="tt">
+          <table class="tt" aria-hidden="true">
             <colgroup><col class="c-time">${cols}</colgroup>
             <thead>
               <tr><th rowspan="2" class="h-time"></th>${dayHead}</tr>
@@ -301,10 +306,11 @@ class Timetable {
             </thead>
             <tbody>${rows.join("")}</tbody>
           </table>
-          <div class="tt-blocks"></div>
+          <div class="tt-blocks" aria-hidden="true"></div>
         </div>
       </div>
-      <div class="tt-hint">Drag down a column to add · click a block for details${this.data.single ? "" : " · swipe sideways to change week"}</div>`;
+      <div class="tt-hint">Drag down a column to add · click a block for details${this.data.single ? "" : " · swipe sideways to change week"}</div>
+      <div class="tt-a11y" role="region" aria-label="Timetable blocks (press Enter on one for details; to add blocks with the keyboard or your voice, ask Arete in the chat)"></div>`;
 
     // Blocks are positioned from the cells, so redo them when the size changes.
     this.blocksEl = this.root.querySelector(".tt-blocks");
@@ -392,6 +398,27 @@ class Timetable {
         .map((c) => `<span class="chip" title="${esc(c.title)} (Outlook, all day)">${esc(c.title)}</span>`).join("");
     });
     this.layoutBlocks();
+    this.renderBlockList();
+  }
+
+  // For keyboard and screen-reader users: every block as a button, grouped by day,
+  // in a list that's invisible until something in it has focus. Enter opens the
+  // block's details card (with Edit / Delete), the same as clicking it.
+  renderBlockList() {
+    const list = this.root.querySelector(".tt-a11y");
+    if (!list) return;
+    this.listed = [...this.blocks].sort((x, y) => x.di - y.di || x.s - y.s || (x.en.track < y.en.track ? -1 : 1));
+    const groups = this.data.days.map((d, di) => {
+      const day = new Date(d + "T00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+      const items = this.listed.map((b, i) => [b, i]).filter(([b]) => b.di === di).map(([b, i]) => {
+        const cat = this.cats.get(b.en.categoryId);
+        const what = `${b.outlook ? "Plan (Outlook)" : b.en.track === "plan" ? "Plan" : "Actual"}: ${b.en.label}, ` +
+          `${b.outlook ? b.en.exact : `${b.en.start} to ${b.en.end}`}${cat ? `, ${cat.name}` : ""}`;
+        return `<button data-i="${i}">${esc(what)}</button>`;
+      });
+      return items.length ? `<div role="group" aria-label="${esc(day)}"><span class="a11y-day">${esc(day)}</span>${items.join("")}</div>` : "";
+    }).join("");
+    list.innerHTML = groups || `<button disabled>Nothing in the timetable this ${this.data.single ? "day" : "week"}</button>`;
   }
 
   // Draw each entry as one rounded block laid over its slot cells.
@@ -507,6 +534,17 @@ class Timetable {
       this.closePopover();
       this.drag = { di: +td.dataset.d, track: td.dataset.t, a: +td.dataset.s, b: +td.dataset.s };
       this.highlight();
+    });
+
+    this.root.querySelector(".tt-a11y").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-i]");
+      if (!b) return;
+      const block = this.listed[+b.dataset.i];
+      const hit = block.outlook ? { outlook: true, ev: { ...block.en, title: block.en.label } } : { outlook: false, entry: block.en };
+      this.openCard(hit);
+      // Move focus into the card so its buttons are next; Esc closes it and returns here.
+      this.returnFocus = b;
+      if (this.popover) { this.popover.tabIndex = -1; this.popover.focus(); }
     });
 
     table.addEventListener("mouseover", (e) => {
@@ -685,6 +723,8 @@ class Timetable {
 
     const card = document.createElement("div");
     card.className = "tt-pop tt-peek";
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-label", `${hit.outlook ? item.title : item.label}, details`);
     card.innerHTML = `
       <div class="pk-title">${hit.outlook ? CAL_ICON : ""}<b>${esc(title)}</b></div>
       <div class="pk-when">${esc(day)} · ${esc(when)}</div>
