@@ -38,7 +38,7 @@ It runs entirely on your Mac as a normal app. It's built with [Streamlit](https:
 
 ## Features
 
-**Home.** Today's agenda and timetable on the left. On the right: the box to ask Claude, your to-dos, and your goals' progress bars.
+**Home.** Today's agenda and timetable on the left. On the right: the box to ask Claude, your to-dos, today's habits to tick (with the last 7 days and your streak), and your goals' progress bars.
 
 **To-dos (on Home).** Today's, this week's and this month's to-do lists, side by side, in the style of Apple Reminders.
 - **Ticking off:** click the circle; the to-do moves into a folded "Completed" section. Click it again to untick.

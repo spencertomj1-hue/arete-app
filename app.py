@@ -76,7 +76,7 @@ def _agenda():
 
 
 def page_home():
-    """Landing page: agenda + today's Plan / Actual on the left; the Ask box, to-dos and goals on the right."""
+    """Landing page: agenda + today's Plan / Actual on the left; the Ask box, to-dos, habits and goals on the right."""
     left, right = st.columns([2, 3], gap="large")
     with left:
         _agenda()
@@ -84,6 +84,7 @@ def page_home():
     with right:
         chat.render(inline=True)
         todos.render_home()
+        daily_log.render_home_habits()
         goals.render_home()
 
 

@@ -33,7 +33,7 @@ app.py                       Streamlit entry: global CSS, wizard gate, sidebar n
 store.py                     ALL SQL; timetable painting rules; settings.json; stats. No Streamlit.
 timetable.py                 Timetable page and the week/day grid component's Python side
 timetable_component.js/.css  The grid (Streamlit components v2, shadow root)
-daily_log.py                 Daily log page (month calendar + day card + entry form) and Habits page
+daily_log.py                 Daily log page (month calendar + day card + entry form), Habits page, and Home's habits
 todos.py                     Home's to-do cards: the to-do list component's Python side
 todos_component.js/.css      The Reminders-style to-do lists (3 compact cards: day, week, month)
 goals.py                     Goals page and Home's goal bars (native Streamlit widgets + an HTML bar)

@@ -82,3 +82,16 @@ def test_todo_component_ops(store):
     assert store.get_todo("t1")["period"] == "monthly"
     todos.apply_op({"kind": "delete", "id": "t2"})
     assert store.get_todo("t2") is None
+
+
+def test_home_habits_tick_today(store):
+    from datetime import date
+    store.add_habit("Stretch")
+    hid = store.find_habit("stretch")[0]
+    at = app()
+    key = f"home_habit_{hid}_{date.today().isoformat()}"
+    at.checkbox(key=key).check().run()
+    assert not at.exception
+    assert date.today().isoformat() in store.get_habit_dates(hid)
+    at.button(key="home_habits_manage").click().run()
+    assert at.sidebar.radio[0].value == "Habits"

@@ -116,6 +116,43 @@ def _toggle_habit(habit_id, day, key):
         store.set_habit_done(conn, habit_id, day, st.session_state[key])
 
 
+def _open_habits():
+    st.session_state["page"] = "Habits"     # the sidebar radio's key; button callbacks run before it's drawn
+
+
+def render_home_habits():
+    """Home: today's habits to tick, each with the last 7 days and its current streak."""
+    today = date.today()
+    days = [today - timedelta(days=i) for i in range(6, -1, -1)]
+    accent = st.get_option("theme.primaryColor") or "#ff4b4b"
+    head, link = st.columns([4, 1], vertical_alignment="center")
+    head.markdown("**Habits**")
+    link.button("Manage", key="home_habits_manage", type="tertiary", on_click=_open_habits)
+
+    habits = store.get_habits()
+    if not habits:
+        st.caption("No habits yet. Add some on the Habits page.")
+        return
+    st.html(f"""<style>
+      .hb-week {{ display: flex; gap: 4px; justify-content: flex-end; }}
+      .hb-week i {{ width: 11px; height: 11px; border-radius: 3px; background: rgba(128, 128, 128, 0.18); }}
+      .hb-week i.on {{ background: {accent}; }}
+      .hb-week i.today {{ outline: 1.5px solid rgba(128, 128, 128, 0.6); outline-offset: 1px; }}
+    </style>""")
+    d = today.isoformat()
+    for habit_id, name in habits:
+        done = store.get_habit_dates(habit_id)
+        current, _ = store.streaks(done, today)
+        key = f"home_habit_{habit_id}_{d}"
+        tick, week, streak = st.columns([5, 3, 2], vertical_alignment="center")
+        tick.checkbox(name, value=d in done, key=key, on_change=_toggle_habit, args=(habit_id, d, key))
+        cells = "".join(
+            f'<i class="{"on" if x.isoformat() in done else ""}{" today" if x == today else ""}" '
+            f'title="{x:%a %-d %b}"></i>' for x in days)
+        week.html(f'<div class="hb-week" title="Last 7 days">{cells}</div>')
+        streak.caption(f":material/local_fire_department: {current}" if current else "–")   # current streak
+
+
 def page_habits():
     st.header("Habits")
     day = st.date_input("Day", value=date.today(), max_value=date.today(), format="DD/MM/YYYY")
