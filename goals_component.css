@@ -1,0 +1,246 @@
+/* Goal lists — Apple Reminders-style rows using the app's font and theme. */
+
+.gl-root {
+  --text: var(--st-text-color, #31333f);
+  --bg: var(--st-background-color, #fff);
+  --soft: var(--st-secondary-background-color, #f6f7f9);
+  --line: rgba(128, 128, 128, 0.22);
+  --muted: rgba(128, 128, 128, 0.95);
+  --accent: var(--st-primary-color, #ff4b4b);
+  --radius: var(--st-base-radius, 0.5rem);
+  container-type: inline-size;
+  font: inherit;
+  color: var(--text);
+}
+
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+svg { display: block; }
+
+/* ---------- Layout: Goals page 2 columns, Home 3 cards; one column when narrow ---------- */
+
+.gl-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.gl-grid.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@container (max-width: 720px) { .gl-grid:not(.compact) { grid-template-columns: minmax(0, 1fr); } }
+@container (max-width: 560px) { .gl-grid.compact { grid-template-columns: minmax(0, 1fr); } }
+
+.gl-card {
+  padding: 14px 14px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  min-width: 0;
+}
+.compact .gl-card { padding: 10px 10px 6px; border-radius: 12px; font-size: 0.86rem; }
+
+/* ---------- Header: ring, name, n/m, See all ---------- */
+
+.gl-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.gl-name { font-size: 1.15rem; font-weight: 650; letter-spacing: -0.01em; }
+.compact .gl-name { font-size: 0.98rem; }
+.gl-count { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.9em; }
+
+.gl-ring { width: 18px; height: 18px; flex: none; transform: rotate(-90deg); }
+.gl-ring circle { fill: none; stroke-width: 2.6; }
+.gl-ring .track { stroke: rgba(128, 128, 128, 0.25); }
+.gl-ring .fill { stroke: var(--accent); stroke-linecap: round; transition: stroke-dasharray 0.35s ease; }
+.gl-ring.full .track { stroke: var(--accent); }
+
+.gl-link {
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.gl-head .gl-link { margin-left: auto; }
+.gl-link:hover { text-decoration: underline; }
+.gl-more { display: block; margin: 2px 0 0 26px; }
+
+/* ---------- Period navigation (Goals page) ---------- */
+
+.gl-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+.gl-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.gl-when { padding: 0 6px; font-size: 0.8rem; white-space: nowrap; }
+.gl-icon { border: none; background: transparent; padding: 3px 7px; display: inline-flex; }
+.gl-icon svg { width: 15px; height: 15px; }
+.gl-icon:hover { background: rgba(128, 128, 128, 0.1); }
+.gl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.78rem;
+}
+.gl-chip svg { width: 13px; height: 13px; }
+.gl-chip:hover:not(:disabled) { background: rgba(128, 128, 128, 0.1); }
+.gl-chip:disabled { opacity: 0.4; cursor: default; }
+.gl-carry { margin-left: auto; }
+
+/* ---------- Rows ---------- */
+
+.gl-list { list-style: none; margin: 0; padding: 0; }
+.gl-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 2px 6px 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  user-select: none;
+  touch-action: pan-y;
+}
+.compact .gl-row { gap: 8px; padding: 4px 2px 4px 0; }
+.gl-list.sorting .gl-row { transition: transform 0.15s ease; }
+.gl-list.sorting .gl-row.dragging {
+  z-index: 2;
+  transition: none;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  cursor: grabbing;
+}
+
+.gl-tick {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1.6px solid rgba(128, 128, 128, 0.6);
+  border-radius: 50%;
+  background: transparent;
+  color: transparent;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+.compact .gl-tick { width: 18px; height: 18px; }
+.gl-tick svg { width: 14px; height: 14px; }
+.gl-tick:hover { border-color: var(--accent); }
+.gl-tick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gl-row.done .gl-tick { background: var(--accent); border-color: var(--accent); color: #fff; }
+.gl-tick.ghost { border-style: dashed; opacity: 0.6; }
+
+.gl-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding-top: 1px; }
+.gl-title {
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  cursor: text;
+  transition: color 0.25s ease, opacity 0.25s ease;
+}
+.gl-notes { font-size: 0.8em; color: var(--muted); line-height: 1.3; overflow-wrap: anywhere; }
+.gl-row.done .gl-title { text-decoration: line-through; opacity: 0.5; }
+.gl-repeat { flex: none; color: var(--muted); margin-top: 2px; }
+.gl-repeat svg { width: 13px; height: 13px; }
+
+/* Just ticked: the circle pops, the title fades and strikes, then the row folds away. */
+.gl-row.ticking .gl-tick { animation: gl-pop 0.35s ease; }
+.gl-row.ticking .gl-title { animation: gl-fade 0.35s ease; }
+.gl-row.leaving { animation: gl-leave 0.26s ease forwards; overflow: hidden; }
+@keyframes gl-pop {
+  0% { transform: scale(1); background: transparent; color: transparent; }
+  45% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+@keyframes gl-fade { from { opacity: 1; } to { opacity: 0.5; } }
+@keyframes gl-leave {
+  from { max-height: 4em; opacity: 1; }
+  to { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-bottom-width: 0; }
+}
+
+.gl-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  line-height: 1.35;
+}
+.gl-notes-input { font-size: 0.8em; color: var(--muted); }
+
+/* ---------- New goal ---------- */
+
+.gl-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  text-align: left;
+}
+.compact .gl-add { gap: 8px; padding: 5px 0; }
+.gl-add svg { width: 20px; height: 20px; flex: none; }
+.compact .gl-add svg { width: 18px; height: 18px; }
+.gl-add:hover { color: var(--accent); }
+.gl-add.editing { border-bottom: 1px solid var(--line); }
+.gl-add.editing .gl-tick { width: 20px; height: 20px; margin-top: 0; }
+.compact .gl-add.editing .gl-tick { width: 18px; height: 18px; }
+
+/* ---------- Completed (n) ---------- */
+
+.gl-done-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.gl-done-head svg { width: 14px; height: 14px; transition: transform 0.15s ease; }
+.gl-done-head.open svg { transform: rotate(90deg); }
+.gl-done-list .gl-row:last-child { border-bottom: none; }
+
+/* ---------- Right-click menu ---------- */
+
+.gl-menu {
+  position: fixed;
+  z-index: 1000001;
+  min-width: 200px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+  font-size: 0.85rem;
+}
+.gl-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+}
+.gl-menu button svg { width: 15px; height: 15px; flex: none; opacity: 0.75; }
+.gl-menu button:hover { background: rgba(128, 128, 128, 0.12); }
+.gl-menu .danger { color: #e5484d; }
+.gl-menu-check { margin-left: auto; color: var(--accent); }
+.gl-menu-sep { height: 1px; margin: 4px 2px; background: var(--line); }
+.gl-menu-label { padding: 4px 8px 2px; font-size: 0.72rem; font-weight: 600; color: var(--muted); }
