@@ -16,7 +16,7 @@ fail() { printf "\n\033[31m%s\033[0m\n" "$1"; exit 1; }
 
 # --- 1. macOS and Python ----------------------------------------------------
 say "1/3  Checking macOS and Python…"
-[ "$(uname -s)" = "Darwin" ] || fail "Arete only runs on macOS."
+[ "$(uname -s)" = "Darwin" ] || fail "setup.sh is for macOS. On Windows, run setup.ps1 instead."
 echo "macOS $(sw_vers -productVersion)"
 PY=""
 for candidate in python3.13 python3; do

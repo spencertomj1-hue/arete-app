@@ -6,7 +6,6 @@ microphone work, app settings (settings.json), backups and opening folders.
 
 import json
 import os
-import shutil
 import sqlite3
 import subprocess
 import time
@@ -17,10 +16,14 @@ import numpy as np
 
 from arete import assistant
 from arete import store
+from arete import system
 from arete import voice
 
 # Shown (with copy buttons) when Claude Code isn't installed or logged in.
-INSTALL_CMD = "curl -fsSL https://claude.ai/install.sh | bash"
+# How to install Claude Code: PowerShell on Windows, Terminal elsewhere.
+INSTALL_CMD = ("irm https://claude.ai/install.ps1 | iex" if system.IS_WINDOWS
+               else "curl -fsSL https://claude.ai/install.sh | bash")
+SHELL = "PowerShell" if system.IS_WINDOWS else "Terminal"
 LOGIN_CMD = "claude auth login"
 
 WHISPER_CACHE = Path.home() / ".cache" / "huggingface" / "hub" / "models--Systran--faster-whisper-small.en"
@@ -114,7 +117,6 @@ def list_backups():
     return sorted(backups_dir().glob("life-*.db"), reverse=True) if backups_dir().exists() else []
 
 
-def open_in_finder(path):
-    Path(path).mkdir(parents=True, exist_ok=True)
-    if shutil.which("open"):
-        subprocess.run(["open", str(path)], check=False)
+def open_folder(path):
+    """Show a folder in Finder / File Explorer."""
+    system.open_folder(path)

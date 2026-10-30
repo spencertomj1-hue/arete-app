@@ -17,7 +17,10 @@ import tempfile
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-REAL_DATA = Path.home() / "Library" / "Application Support" / "Arete"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from arete.system import default_data_dir  # noqa: E402
+
+REAL_DATA = default_data_dir()
 
 
 def pick_folder():

@@ -8,7 +8,8 @@ MCP tools below: no Bash, files or web.
 
 Arete.app starts from Finder with a bare PATH, so the CLI is located
 explicitly (see find_claude) and USER/HOME are passed through, because the CLI
-needs them to read its login from the macOS Keychain.
+needs them to read its login from the macOS Keychain. On Windows the CLI is
+usually claude.exe in ~/.local/bin (or an npm claude.cmd).
 """
 
 import asyncio
@@ -27,6 +28,7 @@ from claude_agent_sdk import (
 )
 
 from arete import store
+from arete import system
 from arete import tools
 
 CONFIG_PATH = store.DATA_DIR / "arete_config.json"   # optional: {"claude_path": "...", "model": "..."}
@@ -39,15 +41,18 @@ AGENT_DIR = store.DATA_DIR / "agent"
 CLAUDE_CANDIDATES = [
     "~/.claude/local/claude", "~/.local/bin/claude", "/opt/homebrew/bin/claude",
     "/usr/local/bin/claude", "~/.npm-global/bin/claude", "~/.bun/bin/claude",
+] if not system.IS_WINDOWS else [
+    "~/.local/bin/claude.exe", "~/.claude/local/claude.exe", "~/AppData/Roaming/npm/claude.cmd",
+    "~/.bun/bin/claude.exe",
 ]
 
-LOGIN_HELP = ("Claude isn't logged in. Open Terminal, run `claude`, and log in with /login. "
+LOGIN_HELP = (f"Claude isn't logged in. Open {'PowerShell' if system.IS_WINDOWS else 'Terminal'}, run `claude`, and log in with /login. "
               "Then try again.")
 
 
 def load_config():
     try:
-        return json.loads(CONFIG_PATH.read_text())
+        return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
 
@@ -71,11 +76,16 @@ def find_claude():
 
 def _env(claude_path):
     """Extra environment for the CLI: a usable PATH and the user's identity."""
-    path_dirs = [str(Path(claude_path).parent), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
-    path = ":".join(dict.fromkeys(path_dirs + os.environ.get("PATH", "").split(":")))
-    user = os.environ.get("USER") or getpass.getuser()
-    return {"PATH": path, "USER": user, "LOGNAME": os.environ.get("LOGNAME") or user,
-            "HOME": os.environ.get("HOME") or str(Path.home())}
+    path_dirs = [str(Path(claude_path).parent)]
+    if not system.IS_WINDOWS:
+        path_dirs += ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
+    path = os.pathsep.join(dict.fromkeys(path_dirs + os.environ.get("PATH", "").split(os.pathsep)))
+    user = os.environ.get("USER") or os.environ.get("USERNAME") or getpass.getuser()
+    env = {"PATH": path, "USER": user, "LOGNAME": os.environ.get("LOGNAME") or user,
+           "HOME": os.environ.get("HOME") or str(Path.home())}
+    if system.IS_WINDOWS:
+        env["USERPROFILE"] = os.environ.get("USERPROFILE") or str(Path.home())
+    return env
 
 
 # ---------------------------------------------------------------------------

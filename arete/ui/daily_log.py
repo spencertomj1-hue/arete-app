@@ -19,8 +19,8 @@ HERE = Path(__file__).parent
 _calendar_component = st.components.v2.component(
     "log_calendar",
     html='<div class="cal-root"></div>',
-    css=(HERE / "components" / "calendar_component.css").read_text(),
-    js=(HERE / "components" / "calendar_component.js").read_text(),
+    css=(HERE / "components" / "calendar_component.css").read_text(encoding="utf-8"),
+    js=(HERE / "components" / "calendar_component.js").read_text(encoding="utf-8"),
 )
 
 

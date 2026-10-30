@@ -2,8 +2,8 @@
 Data layer for Arete: every SQL query lives here. No Streamlit code, so the
 pages, the Claude tools and the tests all share the same logic.
 
-All user data lives in the data folder: ~/Library/Application Support/Arete
-(or $ARETE_DATA_DIR, used for tests and the demo). The database is life.db
+All user data lives in the data folder (system.default_data_dir(): ~/Library/Application Support/Arete
+on a Mac, %APPDATA%\Arete on Windows, ~/.local/share/Arete on Linux), or $ARETE_DATA_DIR, used for tests and the demo). The database is life.db
 there (or $ARETE_DB). Backups, settings.json and the Outlook cache live there
 too. Nothing user-specific is kept in the project folder.
 """
@@ -19,7 +19,9 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-DATA_DIR = Path(os.environ.get("ARETE_DATA_DIR") or Path.home() / "Library" / "Application Support" / "Arete")
+from arete import system
+
+DATA_DIR = Path(os.environ.get("ARETE_DATA_DIR") or system.default_data_dir())
 DB_PATH = Path(os.environ.get("ARETE_DB") or DATA_DIR / "life.db")
 
 # Habits appear as extra columns in the History table and CSV, named "habit: <name>".
@@ -244,7 +246,7 @@ def settings_path():
 
 def load_settings():
     try:
-        return json.loads(settings_path().read_text())
+        return json.loads(settings_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
 
@@ -252,7 +254,7 @@ def load_settings():
 def save_settings(**changes):
     settings = {**load_settings(), **changes}
     settings_path().parent.mkdir(parents=True, exist_ok=True)
-    settings_path().write_text(json.dumps(settings, indent=2))
+    settings_path().write_text(json.dumps(settings, indent=2), encoding="utf-8")
     return settings
 
 

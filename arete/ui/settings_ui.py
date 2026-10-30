@@ -14,6 +14,7 @@ import streamlit as st
 from arete import outlook
 from arete import setup_checks
 from arete import store
+from arete import system
 
 STEPS = [("Welcome", ":material/waving_hand:"), ("Claude", ":material/chat:"),
          ("Calendar", ":material/calendar_month:"), ("Microphone", ":material/mic:"), ("Done", ":material/check_circle:")]
@@ -32,10 +33,10 @@ def claude_section(prefix):
     else:
         st.warning(status["note"], icon=":material/warning:")
         st.markdown("The chat bar uses **Claude Code**, Anthropic's command-line app, with your Claude account. "
-                    "Open the **Terminal** app and run these one at a time (use the copy button on each):")
+                    f"Open the **{setup_checks.SHELL}** app and run these one at a time (use the copy button on each):")
         if not status["found"]:
             st.markdown("**1. Install Claude Code**")
-            st.code(setup_checks.INSTALL_CMD, language="bash")
+            st.code(setup_checks.INSTALL_CMD, language="powershell" if system.IS_WINDOWS else "bash")
         st.markdown(f"**{'2' if not status['found'] else '1'}. Sign in** (opens your browser)")
         st.code(setup_checks.LOGIN_CMD, language="bash")
         st.caption("Then come back here and press Check again. Everything else in Arete works without this.")
@@ -103,7 +104,7 @@ def calendar_status(prefix):
     if b.button("Disconnect", key=f"{prefix}_disconnect", icon=":material/link_off:"):
         st.session_state[f"{prefix}_confirm_disconnect"] = True
     if st.session_state.get(f"{prefix}_confirm_disconnect"):
-        st.warning("Disconnect removes the link from your Keychain and the imported events from the timetable. "
+        st.warning(f"Disconnect removes the link from the {system.SECRET_STORE} and the imported events from the timetable. "
                    "Your own blocks aren't touched.")
         c, d, _ = st.columns([1, 1, 3])
         if c.button("Yes, disconnect", key=f"{prefix}_disconnect_yes", type="primary"):
@@ -119,8 +120,8 @@ def calendar_status(prefix):
 
 
 def mic_section(prefix):
-    st.markdown("Click the mic in the chat bar to speak instead of typing. The first time, macOS asks whether "
-                "**Arete may use the microphone**: click **Allow**. Your voice is turned into text on this Mac "
+    st.markdown("Click the mic in the chat bar to speak instead of typing. The first time, your computer may ask whether "
+                f"**Arete may use the microphone**: click **Allow**. Your voice is turned into text on this {system.COMPUTER} "
                 "and never uploaded.")
     if not setup_checks.speech_model_downloaded():
         st.caption("The first test downloads the speech model (about 470 MB), so it can take a minute.")
@@ -172,7 +173,7 @@ def wizard():
                 "- :material/calendar_view_week: a **timetable** of what you planned and what you actually did\n"
                 "- :material/mood: a **daily log** of mood, sleep and energy, and your **habits**\n"
                 "- :material/chat: a **chat box** where you can ask Claude to update it all for you\n\n"
-                ":material/lock: **Your data stays on your Mac.** Nothing is uploaded, except the messages you "
+                f":material/lock: **Your data stays on your {system.COMPUTER}.** Nothing is uploaded, except the messages you "
                 "send to Claude.\n\nThis takes about two minutes. You can skip anything and set it up later "
                 "in **Settings**."
             )
@@ -235,7 +236,7 @@ def page_settings():
         st.subheader("About Arete")
         st.markdown(
             "A personal life tracker: timetable, daily log, habits, stats and a Claude chat box. "
-            "Built with Streamlit and SQLite; runs entirely on your Mac.\n\n"
+            f"Built with Streamlit and SQLite; runs entirely on your {system.COMPUTER}.\n\n"
             "Open source under the **MIT licence**."
         )
         if st.button("Run the setup wizard again", icon=":material/restart_alt:"):
@@ -249,12 +250,12 @@ def _data_section():
     st.markdown(f":material/folder: `{store.DATA_DIR}`")
     a, b, c = st.columns(3)
     if a.button("Open data folder", icon=":material/folder_open:"):
-        setup_checks.open_in_finder(store.DATA_DIR)
+        setup_checks.open_folder(store.DATA_DIR)
     if b.button("Back up now", icon=":material/backup:"):
         path = setup_checks.backup_now()
         st.toast(f"Backed up to {path.name}", icon=":material/check_circle:")
     if c.button("Open backups folder", icon=":material/inventory_2:"):
-        setup_checks.open_in_finder(setup_checks.backups_dir())
+        setup_checks.open_folder(setup_checks.backups_dir())
     backups = setup_checks.list_backups()
     st.caption(f"{len(backups)} backup{'s' if len(backups) != 1 else ''}"
                + (f", latest {backups[0].name}" if backups else "") + ".")

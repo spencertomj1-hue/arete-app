@@ -4,12 +4,14 @@ Build the app icon from assets/Logo.jpg.
 Crops the logo to its drawing, centres it on a white rounded square (the
 standard macOS icon shape, with a soft shadow), and writes:
   assets/icon.png   1024x1024 (also used as the Dock icon by desktop.py)
-  assets/Arete.icns all sizes, for Arete.app/Contents/Resources
+  assets/Arete.icns all sizes, for Arete.app/Contents/Resources (macOS)
+  assets/icon.ico   all sizes, for the Windows shortcuts made by setup.ps1
   assets/splash.png the cleaned drawing, for the loading screen
 
 Run with:   .venv/bin/python scripts/make_icon.py
 """
 
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -20,6 +22,7 @@ ASSETS = Path(__file__).resolve().parents[1] / "assets"
 LOGO = ASSETS / "Logo.jpg"
 PNG = ASSETS / "icon.png"
 ICNS = ASSETS / "Arete.icns"
+ICO = ASSETS / "icon.ico"
 SPLASH = ASSETS / "splash.png"
 
 SIZE = 1024
@@ -77,7 +80,14 @@ def build_icns(icon):
         subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(ICNS)], check=True)
 
 
+def build_ico(icon):
+    icon.save(ICO, sizes=[(s, s) for s in (16, 24, 32, 48, 64, 128, 256)])
+
+
 if __name__ == "__main__":
-    build_icns(build_png())
+    icon = build_png()
+    build_ico(icon)
+    if shutil.which("iconutil"):            # macOS only
+        build_icns(icon)
     build_splash()
-    print(f"Wrote {PNG.name}, {ICNS.name} and {SPLASH.name}")
+    print(f"Wrote the icons and {SPLASH.name}")

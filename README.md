@@ -6,7 +6,7 @@
 
 <p align="center">
   Track everything, in one place, modifiable to your will.
-  A personal life tracker for your Mac: a weekly Plan-vs-Actual timetable, a daily log
+  A personal life tracker for your Mac or Windows PC: a weekly Plan-vs-Actual timetable, a daily log
   of mood, sleep and energy, habits with streaks, to-dos and goals, a map of the people you know, and a Claude chat box that updates it all for you.
 </p>
 
@@ -20,7 +20,7 @@
 
 *Arete* (ἀρετή) is the Greek idea of excellence: living up to your potential. Arete helps by recording each day honestly: what you planned, what you actually did, how you felt and which habits you kept.
 
-It runs entirely on your Mac as a normal app. It's built with [Streamlit](https://streamlit.io) and SQLite and shown in its own window. There are no accounts, no servers and no cloud sync.
+It runs entirely on your computer (Mac or Windows) as a normal app. It's built with [Streamlit](https://streamlit.io) and SQLite and shown in its own window. There are no accounts, no servers and no cloud sync.
 
 ## Contents
 
@@ -75,7 +75,7 @@ It runs entirely on your Mac as a normal app. It's built with [Streamlit](https:
 > "I read 2 more books"
 > "Add Sam, a friend from uni who works at Northbank; she knows Alex from football"
 
-Claude only changes Arete's data, through a fixed set of actions. **Anything that deletes or overwrites data shows a preview with Confirm / Cancel first.** Voice input is transcribed **on your Mac**.
+Claude only changes Arete's data, through a fixed set of actions. **Anything that deletes or overwrites data shows a preview with Confirm / Cancel first.** Voice input is transcribed **on your computer**.
 
 **Outlook calendar (optional).** Your published Outlook calendar appears in the timetable's Plan column, and you can remove or adjust any event. It's read only: nothing is ever written back to Outlook.
 
@@ -117,12 +117,15 @@ Claude only changes Arete's data, through a fixed set of actions. **Anything tha
 
 ## Requirements
 
-- **A Mac** running macOS 11 or later (built and tested on macOS 26).
-- **Python 3.13.** Install it from [python.org](https://www.python.org/downloads/) or with Homebrew: `brew install python@3.13`.
+- **A Mac** running macOS 11 or later (built and tested on macOS 26), **or a Windows 10/11 PC** (the tests run on Windows; the app window uses Microsoft Edge WebView2, which Windows 10/11 already has).
+- **Python 3.13.** Install it from [python.org](https://www.python.org/downloads/) (on Windows, tick **Add python.exe to PATH**), or on a Mac with Homebrew: `brew install python@3.13`.
+- **Git**, to download Arete: built into macOS; on Windows, install it from [git-scm.com](https://git-scm.com/download/win).
 - **About 2 GB of free disk space:** roughly 1 GB for the packages, plus about 470 MB for the speech model the first time you use the microphone.
 - **Optional, for the chat:** [Claude Code](https://docs.claude.com/en/docs/claude-code) signed in with your own Claude account, **or** your own `ANTHROPIC_API_KEY`.
 
 ## Install
+
+### Mac
 
 Open the **Terminal** app and run:
 
@@ -141,6 +144,18 @@ It's safe to run again, for example after `git pull`.
 
 Then open **Arete** from Applications, Launchpad or Spotlight. The first time, macOS may say it's from an unidentified developer: right-click Arete → **Open** → **Open**.
 
+### Windows
+
+Open **PowerShell** and run:
+
+```powershell
+git clone https://github.com/spencertomj1-hue/arete-app.git
+cd arete-app
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
+```
+
+`setup.ps1` checks for Python 3.13, installs the tested packages into `.venv`, and adds an **Arete** shortcut to the Start menu and the desktop. It's safe to run again after `git pull`.
+
 ## First run
 
 A short setup guide appears the first time. Every step can be skipped, and you can rerun it from **Settings → About**.
@@ -148,7 +163,7 @@ A short setup guide appears the first time. Every step can be skipped, and you c
 1. **Welcome:** what Arete does, and where your data lives.
 2. **Claude:** checks whether Claude Code is installed and signed in. If it isn't, it shows the two commands to run, with copy buttons. Everything else works without it.
 3. **Outlook calendar (optional):** see below.
-4. **Microphone:** explains the macOS permission prompt and lets you test the mic.
+4. **Microphone:** explains the microphone permission prompt and lets you test the mic.
 
 ## Connecting Outlook
 
@@ -160,7 +175,7 @@ In the setup guide or **Settings → Calendar**:
 4. Copy the **ICS** link (the one ending in `.ics`, not `.html`).
 5. Paste it into Arete and press **Connect**.
 
-Arete checks the link, shows how many events it found, and stores the link in your **macOS Keychain**. It syncs when the app opens, every 15 minutes, and when you press ↻.
+Arete checks the link, shows how many events it found, and stores the link in your **macOS Keychain** (on Windows, the **Windows Credential Manager**). It syncs when the app opens, every 15 minutes, and when you press ↻.
 
 **Anyone who has the link can see your calendar.** To revoke it, go back to Shared calendars and click **Unpublish** (or **Reset links** to get a new one).
 
@@ -178,14 +193,14 @@ Claude can only use Arete's own actions: logging days, ticking habits, editing t
 
 ## Privacy
 
-**What stays on your Mac:**
-- **Your data:** the timetable, daily log, habits and settings, all in `~/Library/Application Support/Arete/`. That folder is outside the app's folder, so it can never end up in git.
+**What stays on your computer:**
+- **Your data:** the timetable, daily log, habits and settings, all in your data folder: `~/Library/Application Support/Arete/` on a Mac, `%APPDATA%\\Arete` on Windows. That folder is outside the app's folder, so it can never end up in git.
 - **Voice:** recorded and transcribed locally with [faster-whisper](https://github.com/SYSTRAN/faster-whisper). Audio is never uploaded.
-- **Your Outlook link:** stored only in the macOS Keychain.
+- **Your Outlook link:** stored only in the macOS Keychain / Windows Credential Manager.
 - **Chat history:** kept in memory while the app is open, and **not saved to disk**. Claude Code runs with session saving turned off.
-- **The app itself:** it only listens on `127.0.0.1` (this Mac), with XSRF protection on and Streamlit's usage statistics off.
+- **The app itself:** it only listens on `127.0.0.1` (this computer), with XSRF protection on and Streamlit's usage statistics off.
 
-**What leaves your Mac:**
+**What leaves your computer:**
 - **Messages to Claude:** when you use the chat, your message, the recent conversation and whatever data Claude looks up to answer it (for example that week's timetable) go to Anthropic through your Claude Code login or API key, like any Claude conversation.
 - **Calendar fetch:** if you connect Outlook, Arete downloads your published calendar from Microsoft.
 
@@ -193,10 +208,10 @@ Nothing else is sent anywhere.
 
 ## Limitations
 
-- **Mac only.** It uses the macOS Keychain, the app bundle and the native window.
+- **Mac and Windows.** Windows support is new: the tests run on Windows, but report anything odd in Issues. Linux should work from a terminal (`.venv/bin/python desktop.py`) but has no installer yet.
 - **The chat needs your own Claude access:** a Claude Code login or an Anthropic API key.
 - **Outlook publishing may be blocked.** Some universities and workplaces turn off "Publish a calendar". If the option is missing, or Outlook refuses the link, ask your IT team.
-- **Single user, single Mac.** There's no sync between devices.
+- **Single user, single computer.** There's no sync between devices.
 - **Timetable hours:** the grid covers 07:00–01:00. Events outside those hours are clipped.
 
 ## Troubleshooting
@@ -206,12 +221,12 @@ Nothing else is sent anywhere.
 | **"Arete is from an unidentified developer"** | Right-click Arete → Open → Open (only needed once). |
 | **setup.sh says Python 3.13 is missing** | Install it from python.org or with `brew install python@3.13`, then run `./setup.sh` again. |
 | **The chat says Claude isn't logged in** | Run `claude auth login` in Terminal, then **Settings → Claude → Check again**. |
-| **The chat can't find Claude Code** | Check `which claude` in Terminal. If it's somewhere unusual, put `{"claude_path": "/path/to/claude"}` in `~/Library/Application Support/Arete/arete_config.json`. |
+| **The chat can't find Claude Code** | Check `which claude` in Terminal (`where.exe claude` in PowerShell on Windows). If it's somewhere unusual, put `{"claude_path": "/path/to/claude"}` in `arete_config.json` in your data folder (see Privacy). |
 | **"Outlook refused this link"** | Your organisation may block publishing (ask IT), or the link was reset; publish again and paste the new ICS link. |
 | **The calendar header says "Offline"** | Arete keeps showing the last synced events; it syncs again when you're back online (or press ↻). |
 | **The mic records silence** | Allow Arete in System Settings → Privacy & Security → Microphone. |
 | **The app moved, or you moved the folder** | Run `./setup.sh` again to rebuild Arete.app. |
-| **Starting over** | Quit Arete and move `~/Library/Application Support/Arete` somewhere else (or delete it). |
+| **Starting over** | Quit Arete and move your data folder (`~/Library/Application Support/Arete`, or `%APPDATA%\Arete` on Windows) somewhere else, or delete it. |
 
 ## For developers
 

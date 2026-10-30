@@ -20,8 +20,8 @@ PAGE = "Network"
 _network_component = st.components.v2.component(
     "arete_network",
     html='<div class="nw-root"></div>',
-    css=(HERE / "components" / "network_component.css").read_text(),
-    js=(HERE / "components" / "network_component.js").read_text(),
+    css=(HERE / "components" / "network_component.css").read_text(encoding="utf-8"),
+    js=(HERE / "components" / "network_component.js").read_text(encoding="utf-8"),
 )
 
 

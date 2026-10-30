@@ -21,19 +21,23 @@ ARETE_DATA_DIR=<folder> .venv/bin/streamlit run app.py   # run against any data 
 | What | Where |
 |---|---|
 | Code | the cloned folder. **Nothing user-specific is ever written here.** |
-| User data | `~/Library/Application Support/Arete/` (or `$ARETE_DATA_DIR`): `life.db`, `settings.json`, `backups/`, `.outlook_cache.ics`, optional `arete_config.json`, and `agent/` (the Claude Code working folder) |
-| Outlook calendar link | the macOS Keychain, service `Arete`, account `outlook-ics-url` (via `keyring`) |
+| User data | `system.default_data_dir()`: `~/Library/Application Support/Arete/` (macOS), `%APPDATA%\Arete` (Windows), `~/.local/share/Arete` (Linux), or `$ARETE_DATA_DIR`: `life.db`, `settings.json`, `backups/`, `.outlook_cache.ics`, optional `arete_config.json`, and `agent/` (the Claude Code working folder) |
+| Outlook calendar link | the OS's secret store via `keyring` (macOS Keychain / Windows Credential Manager), service `Arete`, account `outlook-ics-url` |
 | Speech model | `~/.cache/huggingface` (downloaded by faster-whisper on first use) |
 | Arete.app | `/Applications/Arete.app` or `~/Applications/Arete.app`, built by `setup.sh`. Its launcher script holds the clone's path, written at build time. |
+| Windows shortcuts | Start menu and desktop `Arete.lnk`, made by `setup.ps1`: `.venv\Scripts\pythonw.exe desktop.py` (no console window), icon `assets/icon.ico` |
 
 ## 3. Files
 
 ```
 app.py                         Streamlit entry: global CSS, wizard gate, sidebar nav, Home/Stats pages, chat bar, Outlook autosync
-desktop.py                     Native window launcher with a splash screen (pywebview); what Arete.app runs
-setup.sh                       One-command install (venv, packages, Arete.app)
+desktop.py                     Native window launcher with a splash screen (pywebview); what Arete.app / the Windows shortcut runs
+setup.sh                       One-command install on macOS (venv, packages, Arete.app)
+setup.ps1                      One-command install on Windows (venv, packages, Start menu + desktop shortcuts)
+.github/workflows/tests.yml    Runs the tests on Windows, macOS and Linux for every push
 
 arete/                         The app's code, as a package (imported as `from arete import store`, ...)
+  system.py                    Everything that differs by OS: data folder, opening a folder, words for the UI
   store.py                     ALL SQL; timetable painting rules; settings.json; stats. No Streamlit.
   tools.py                     What Claude can do: plain functions over store.py, previews for destructive changes
   assistant.py                 Claude via claude-agent-sdk: finds the CLI, system prompt, in-process "arete" MCP server
@@ -179,6 +183,9 @@ Two different things:
 - **Toolbar:** `.streamlit/config.toml` sets `client.toolbarMode = "minimal"`, along with `server.address = 127.0.0.1`, XSRF protection and no usage statistics.
 
 ## 9. Gotchas
+
+- **Always read and write text files as UTF-8** (`read_text(encoding="utf-8")`). Windows defaults to cp1252, which garbles the components' `›`, `…`, `×` etc.
+- **OS differences go in `arete/system.py`** (data folder, opening folders, UI words), so the rest of the code stays the same everywhere.
 
 - **The sidebar radio has `key="page"`.** Home's "See all" sets it from a component callback, which runs before the radio is drawn; don't set it anywhere after that.
 - **NaN breaks components.** pandas turns SQL NULLs into NaN, which is invalid JSON. `store._read()` converts them to `None`; do the same for anything passed in a component's `data`.

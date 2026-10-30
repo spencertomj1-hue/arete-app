@@ -1,8 +1,9 @@
 """
 Desktop launcher: runs the Streamlit app in its own native window (no browser).
 
-Run with:   .venv/bin/python desktop.py
-Or double-click "Arete.app" (in /Applications).
+Run with:   .venv/bin/python desktop.py          (macOS / Linux)
+            .venv/Scripts/pythonw.exe desktop.py  (Windows)
+Or open "Arete.app" (macOS) or the Arete shortcut (Windows), made by setup.sh / setup.ps1.
 """
 
 import atexit
@@ -26,7 +27,7 @@ READY_TIMEOUT = 45                       # give up waiting for the page after th
 def splash_html():
     """splash.html with the logo embedded, so it shows before the server is up."""
     logo = base64.b64encode(SPLASH_LOGO.read_bytes()).decode()
-    return (APP_DIR / "assets" / "splash.html").read_text().replace("{{LOGO}}", f"data:image/png;base64,{logo}")
+    return (APP_DIR / "assets" / "splash.html").read_text(encoding="utf-8").replace("{{LOGO}}", f"data:image/png;base64,{logo}")
 
 
 def set_dock_icon():

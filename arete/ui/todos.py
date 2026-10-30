@@ -21,8 +21,8 @@ HOME_LIMIT = 6        # to-dos shown per card before "N more"
 _todos_component = st.components.v2.component(
     "arete_todos",
     html='<div class="gl-root"></div>',
-    css=(HERE / "components" / "todos_component.css").read_text(),
-    js=(HERE / "components" / "todos_component.js").read_text(),
+    css=(HERE / "components" / "todos_component.css").read_text(encoding="utf-8"),
+    js=(HERE / "components" / "todos_component.js").read_text(encoding="utf-8"),
 )
 
 
