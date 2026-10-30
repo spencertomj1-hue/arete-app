@@ -502,6 +502,21 @@ def _current_goals(day, period=None):
     return [g for p in periods for g in store.goals_for(p, store.goal_period_start(p, day))]
 
 
+FILLER_WORDS = {"the", "a", "an", "my", "to", "do", "finish", "finished", "done", "complete", "tick", "off", "goal"}
+
+
+def _words(text):
+    return set(re.findall(r"[a-z0-9]+", text.lower())) - FILLER_WORDS
+
+
+def _most_shared_words(pool, text):
+    """Goals sharing the most words with `text`, e.g. "finish problem sheet" -> "Problem sheet 4"."""
+    want = _words(text)
+    scores = {g["id"]: len(want & _words(g["title"])) for g in pool}
+    best = max(scores.values(), default=0)
+    return [g for g in pool if best and scores[g["id"]] == best]
+
+
 def _find_goal(goal, period=None, date=None):
     """A goal by id, or by title (exact, then partial) in the periods containing `date` (default today)."""
     store.roll_goals()
@@ -511,7 +526,8 @@ def _find_goal(goal, period=None, date=None):
     per = _period(period) if period else None
     pool = _current_goals(_goal_day(date), per)
     want = str(goal).strip().lower()
-    matches = [g for g in pool if g["title"].lower() == want] or [g for g in pool if want in g["title"].lower()]
+    matches = ([g for g in pool if g["title"].lower() == want] or [g for g in pool if want in g["title"].lower()]
+               or _most_shared_words(pool, want))
     if len(matches) == 1:
         return matches[0]
     if matches:

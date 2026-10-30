@@ -85,7 +85,7 @@ function ring(done, total) {
   const r = 7, c = 2 * Math.PI * r, frac = total ? done / total : 0;
   return `<svg class="gl-ring${total && done === total ? " full" : ""}" viewBox="0 0 18 18">
     <circle cx="9" cy="9" r="${r}" class="track"/>
-    <circle cx="9" cy="9" r="${r}" class="fill" stroke-dasharray="${(frac * c).toFixed(2)} ${c.toFixed(2)}"/></svg>`;
+    ${done ? `<circle cx="9" cy="9" r="${r}" class="fill" stroke-dasharray="${(frac * c).toFixed(2)} ${c.toFixed(2)}"/>` : ""}</svg>`;
 }
 
 // ---------- Entry point ----------
@@ -458,13 +458,14 @@ class GoalLists {
       d.list.classList.add("sorting");
       d.row.classList.add("dragging");
     }
-    // Clamp to the list, then work out the slot under the pointer and make room there.
+    // The row follows the pointer (kept inside the list). Its new slot is the
+    // number of other rows whose middle it has passed; this uses the unclamped
+    // position, so the first and last slots can be reached.
     const first = d.rects[0].top, last = d.rects[d.rects.length - 1].bottom;
     const top = Math.max(first, Math.min(last - d.height, d.rects[d.from].top + dy));
     d.row.style.transform = `translateY(${top - d.rects[d.from].top}px)`;
-    const mid = top + d.height / 2;
-    let to = d.rects.findIndex((r) => mid < r.top + r.height / 2);
-    if (to === -1) to = d.rects.length - 1;
+    const mid = d.rects[d.from].top + dy + d.height / 2;
+    const to = d.rects.filter((r, i) => i !== d.from && r.top + r.height / 2 < mid).length;
     d.to = to;
     d.rows.forEach((r, i) => {
       if (r === d.row) return;

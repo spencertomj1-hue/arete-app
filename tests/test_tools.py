@@ -271,3 +271,10 @@ def test_goal_tools_roll_repeats_first(tools, store, friday):
     store.add_goal("Stretch", "daily", "2026-10-29", repeat=True)
     assert "Stretch" in tools.list_goals(period="daily").text
     assert tools.complete_goal("stretch").changed
+
+
+def test_complete_goal_by_shared_words(tools, store, friday):
+    store.add_goal("Problem sheet 4", "daily", "2026-10-30")
+    store.add_goal("Go gym", "weekly", "2026-10-30")
+    assert "Problem sheet 4" in tools.complete_goal("finish problem sheet").text
+    assert store.goals_for("daily", "2026-10-30")[0]["done"]
