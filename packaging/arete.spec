@@ -9,7 +9,7 @@ import os
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_submodules
+from PyInstaller.utils.hooks import collect_all
 
 ROOT = Path(SPECPATH).parent
 MAC = sys.platform == "darwin"
@@ -22,7 +22,12 @@ datas = [
     (str(ROOT / "arete" / "ui" / "components"), "arete/ui/components"),
 ]
 binaries = []
-hiddenimports = collect_submodules("arete")    # app.py is data, so its imports are listed here
+# app.py is a data file, so Arete's own modules are listed here, from the source files.
+# (Not collect_submodules: it test-imports each module and silently drops the ones that
+# can't be imported outside a running app, which is all of arete/ui.)
+hiddenimports = [".".join(p.relative_to(ROOT).with_suffix("").parts)
+                 for p in sorted((ROOT / "arete").rglob("*.py"))]
+hiddenimports = [m.removesuffix(".__init__") for m in hiddenimports]
 
 # Packages with data files, plugins or entry points that PyInstaller can't find by itself.
 for package in ["streamlit", "plotly", "keyring", "webview", "claude_agent_sdk", "faster_whisper",

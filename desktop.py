@@ -73,19 +73,29 @@ def serve(port):
 
 
 def check():
-    """Import every module and set up a throwaway database: exits 0 if the build is complete."""
+    """
+    Run the real app, headless, on a throwaway data folder and open every page
+    (Streamlit's AppTest): exits 0 only if every page draws without an error.
+    The release build runs this inside the bundle, so a missing module or data
+    file fails the build instead of the user's first launch.
+    """
     quiet_output()
-    import importlib
-    import pkgutil
+    import json
     import tempfile
-    os.environ.setdefault("ARETE_DATA_DIR", tempfile.mkdtemp(prefix="arete-check-"))
-    import arete
-    for module in pkgutil.walk_packages(arete.__path__, "arete."):
-        importlib.import_module(module.name)
-    from arete import store
-    store.init_db()
-    import streamlit.web.cli  # noqa: F401
-    print("Arete check OK")
+    data = Path(os.environ.setdefault("ARETE_DATA_DIR", tempfile.mkdtemp(prefix="arete-check-")))
+    data.mkdir(parents=True, exist_ok=True)
+    (data / "settings.json").write_text(json.dumps({"wizard_done": True}), encoding="utf-8")
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_file(str(APP_DIR / "app.py"), default_timeout=180).run()
+    pages = at.sidebar.radio[0].options if at.sidebar.radio else []
+    problems = [f"Home: {e.message}" for e in at.exception]
+    for page in pages[1:]:
+        at.sidebar.radio[0].set_value(page).run()
+        problems += [f"{page}: {e.message}" for e in at.exception]
+    if problems or not pages:
+        print("Arete check FAILED:\n" + ("\n".join(problems) or "the app didn't draw its menu"))
+        sys.exit(1)
+    print(f"Arete check OK: {len(pages)} pages drawn")
 
 
 def server_flags(port):
