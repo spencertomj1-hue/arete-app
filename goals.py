@@ -59,7 +59,7 @@ def _goal_form(key, goal=None):
     title = st.text_input("Goal", value=goal["title"] if goal else "", key=f"{key}_title",
                           placeholder="e.g. Gym")
     a, b = st.columns(2)
-    target = a.number_input("Target", min_value=0.5, step=1.0, value=float(goal["target"]) if goal else 10.0,
+    target = a.number_input("Target", min_value=0.5, step=1.0, value=float(goal["target"]) if goal else 10.0, format="%g",
                             key=f"{key}_target")
     unit = b.text_input("Unit (optional)", value=(goal["unit"] or "") if goal else "", key=f"{key}_unit",
                         placeholder="sessions, km, books…")
@@ -92,7 +92,7 @@ def _edit_goal(g):
         key = f"edit_{g['id']}"
         values = _goal_form(key, g)
         if not g["habit"]:
-            progress = st.number_input("Progress so far", min_value=0.0, step=1.0, value=float(g["progress"]),
+            progress = st.number_input("Progress so far", min_value=0.0, step=1.0, value=float(g["progress"]), format="%g",
                                        key=f"{key}_progress")
         save, delete = st.columns(2)
         if save.button("Save", key=f"{key}_save", type="primary", width="stretch",
@@ -112,7 +112,7 @@ def _edit_goal(g):
 
 def _goal_row(g):
     with st.container(border=True):
-        text, minus, plus, more = st.columns([8, 1, 1, 1], vertical_alignment="center")
+        text, minus, plus, more = st.columns([5, 1, 1, 1.4], vertical_alignment="center")
         pct = round(100 * fraction(g))
         text.markdown(f"**{escape(g['title'])}**  \n:gray[{escape(amount(g))} · {pct}%]")
         if g["habit"]:
@@ -125,7 +125,7 @@ def _goal_row(g):
                         on_click=store.add_goal_progress, args=(g["id"], 1))
         with more:
             _edit_goal(g)
-        st.progress(fraction(g))
+        st.html(f'<div class="hg-bar">{_fill(g)}</div>' + BAR_CSS.replace("ACCENT", _accent()))
         if g["habit"]:
             st.caption(f":material/sync: Counted from the habit **{escape(g['habit'])}**")
 
@@ -165,13 +165,28 @@ def render_page():
 # Home: this month's and this year's goals as progress bars
 # ---------------------------------------------------------------------------
 
+def _accent():
+    return st.get_option("theme.primaryColor") or "#ff4b4b"
+
+
+def _fill(g):
+    return f'<i style="width:{100 * fraction(g):.1f}%"></i>'
+
+
+# The progress bar used on both pages, in the app's accent colour (st.progress has its own colour).
+BAR_CSS = """<style>
+  .hg-bar { height: 7px; border-radius: 999px; background: rgba(128, 128, 128, 0.18); overflow: hidden; }
+  .hg-bar i { display: block; height: 100%; border-radius: 999px; background: ACCENT; transition: width 0.4s ease; }
+</style>"""
+
+
 CHECK = ('<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" '
          'fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>')
 
 
 def render_home():
     today = store.london_today()
-    accent = st.get_option("theme.primaryColor") or "#ff4b4b"
+    accent = _accent()
     rows = []
     for period in store.GOAL_PERIODS:
         for g in store.goals_in(period, today):
@@ -182,7 +197,7 @@ def render_home():
                 f'<div class="hg-top"><span class="hg-title">{escape(g["title"])}</span>'
                 f'<span class="hg-when">{when}</span>'
                 f'<span class="hg-amount">{CHECK if pct >= 100 else ""}{escape(amount(g))}</span></div>'
-                f'<div class="hg-bar"><i style="width:{pct:.1f}%"></i></div></div>'
+                f'<div class="hg-bar">{_fill(g)}</div></div>'
             )
     head, link = st.columns([4, 1], vertical_alignment="center")
     head.markdown("**Goals**")
@@ -196,8 +211,5 @@ def render_home():
       .hg-amount {{ margin-left: auto; display: inline-flex; align-items: center; gap: 4px; opacity: 0.75;
                     font-variant-numeric: tabular-nums; white-space: nowrap; }}
       .hg-row.done .hg-amount {{ color: {accent}; opacity: 1; font-weight: 600; }}
-      .hg-bar {{ height: 7px; border-radius: 999px; background: rgba(128, 128, 128, 0.18); overflow: hidden; }}
-      .hg-bar i {{ display: block; height: 100%; border-radius: 999px; background: {accent};
-                   transition: width 0.4s ease; }}
       .hg-empty {{ opacity: 0.6; font-size: 0.86rem; }}
-    </style><div class="hg">{body}</div>""")
+    </style><div class="hg">{body}</div>""" + BAR_CSS.replace("ACCENT", accent))

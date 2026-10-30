@@ -34,8 +34,9 @@ store.py                     ALL SQL; timetable painting rules; settings.json; s
 timetable.py                 Timetable page and the week/day grid component's Python side
 timetable_component.js/.css  The grid (Streamlit components v2, shadow root)
 daily_log.py                 Daily log page (month calendar + day card + entry form) and Habits page
-goals.py                     Goals page and Home's goal cards: the goal list component's Python side
-goals_component.js/.css      The Reminders-style goal lists (one component: 4 sections, or 3 compact cards)
+todos.py                     Home's to-do cards: the to-do list component's Python side
+todos_component.js/.css      The Reminders-style to-do lists (3 compact cards: day, week, month)
+goals.py                     Goals page and Home's goal bars (native Streamlit widgets + an HTML bar)
 calendar_component.js/.css   The month calendar component
 tools.py                     What Claude can do: plain functions over store.py, previews for destructive changes
 assistant.py                 Claude via claude-agent-sdk: finds the CLI, system prompt, in-process "arete" MCP server
@@ -63,13 +64,14 @@ tests/                       pytest + AppTest; tests/fixtures/sample.ics is a fa
 | `tt_entries` | The user's timetable blocks: `id`, `date`, `track` (plan/actual), `start`/`"end"` ("HH:mm", end exclusive, may be "01:00"), `label`, `category_id`, `details` |
 | `tt_outlook` | Imported Outlook events, **fully replaced on every sync**: `uid`, `date`, `start`/`"end"` (snapped; NULL if all-day), `title`, `location`, `all_day`, `exact` (real times), `description` |
 | `tt_outlook_hidden` | Outlook occurrences the user removed or detached (kept across syncs) |
-| `goals` | `id`, `title`, `notes`, `period` (daily/weekly/monthly/yearly), `period_start` (the day, its Monday, the 1st or 1 Jan), `done`, `done_at`, `"repeat"`, `ord`, `created_at` |
-| `goal_rollover` | Per period kind, the last period repeating goals were copied into (see §5b) |
+| `todos` | `id`, `title`, `notes`, `period` (daily/weekly/monthly), `period_start` (the day, its Monday or the 1st), `done`, `done_at`, `"repeat"`, `ord`, `created_at` |
+| `todo_rollover` | Per period kind, the last period repeating to-dos were copied into (see §5b) |
+| `goals` | `id`, `title`, `period` (monthly/yearly), `period_start`, `target`, `unit`, `progress` (kept by hand), `habit_id` (NULL = by hand; `ON DELETE SET NULL`), `ord`, `created_at` |
 
 Notes on the schema:
 - **New installs** are seeded with generic categories (groups "Life" and "Work") and activity defaults, in `DEFAULT_CATEGORIES` / `DEFAULT_LABEL_MAP`. Groups are read from the data (`store.groups()`), so a user's own groups work too.
 - **`end` is an SQL keyword** and must be quoted.
-- **Migrations:** columns added later are added by `_add_column` in `init_db`, so existing databases keep working.
+- **Migrations:** columns added later are added by `_add_column` in `init_db`, so existing databases keep working. `_goals_became_todos` handles databases from before the to-do / goal split: their `goals` table (which held to-dos) is backed up to `backups/life-…-before-todos.db`, renamed to `todos` (with `goal_rollover` → `todo_rollover`), and its yearly to-dos dropped.
 - **`settings.json`** holds `wizard_done` and `outlook_category`. Use `store.load_settings` / `save_settings`.
 
 ## 5. Timetable
@@ -86,16 +88,27 @@ Notes on the schema:
 - **Clicking a block** grows it and opens a details card (title, time, category, location, description), with Edit and Delete/Remove buttons except on Home. A drag paints, and a click with the eraser erases.
 - **Block text** is black unless the fill is dark (`contrastText`, luminance threshold 90).
 
-## 5b. Goals
+## 5b. To-dos and goals
 
-- **Periods:** all period maths is in `store.py` (`goal_period_start`, `shift_period`, `goal_period_end`, `period_title`), on Europe/London dates (`london_today()`). Weeks run Monday to Sunday, like the timetable. The JS has a copy of the maths only to place a moved goal instantly.
-- **Repeats:** `roll_goals()` runs whenever the Goals page, Home or a goal tool loads. Once per period (remembered in `goal_rollover`), each title whose latest earlier copy has repeat on gets an unticked copy, unless the title is already there. A copy the user deletes therefore stays deleted, and turning repeat off on the latest copy stops it.
-- **Carry over:** `carry_over(period, start)` copies unticked goals into the next period, skipping titles already there. The originals stay.
-- **Component:** one `arete_goals` component draws all the lists: the Goals page (key `goals_page`: 4 sections with ‹ › and "Carry over unfinished") or Home (key `home_goals`: 3 compact cards, 6 goals each, then "N more"). A container query stacks the cards when the column is narrow.
-- **Protocol:** the same as the timetable grid. The ops are `add`, `toggle`, `edit`, `repeat`, `move`, `delete`, `reorder` and `carry`, each with an `opId`. `goals.apply_op` saves them, and they're acknowledged in `data.acked` (`goal_acked` in session state). An `add` carries the new goal's id, so a resent op adds nothing. Other triggers: `nav` `{period, dir}` (each section's period is in `goals_start_<period>`) and `seeAll`.
-- **Tick animation:** a ticked goal stays in place for 650 ms (circle fills, title fades and strikes through), then folds into "Completed (n)", which is collapsed by default. Which sections are open is kept in sessionStorage.
-- **Editors:** the new-goal, title and notes boxes are redrawn with their text, caret and focus after every rerun (`restoreEditor`), so typing is never lost.
-- **Home placement:** on Home the chat is an inline box, so the cards sit directly under it in the right column.
+Two different things:
+- **To-dos** are tick-off lists for a day, a week or a month, shown only on Home.
+- **Goals** are measurable targets for a month or a year, with progress bars, on the Goals page and on Home.
+
+**Periods (shared):** all period maths is in `store.py` (`start_of_period`, `shift_period`, `end_of_period`, `period_title`), on Europe/London dates (`london_today()`). Weeks run Monday to Sunday, like the timetable.
+
+**To-dos:**
+- **Repeats:** `roll_todos()` runs whenever Home or a to-do tool loads. Once per period (remembered in `todo_rollover`), each title whose latest earlier copy has repeat on gets an unticked copy, unless the title is already there. A copy the user deletes therefore stays deleted, and turning repeat off on the latest copy stops it.
+- **Carry over:** `carry_over(period, start)` copies unticked to-dos into the next period. It's in the store, but not currently in the UI.
+- **Component (`todos_component.*`, key `home_todos`):** three compact cards with up to 6 to-dos each, then "N more", which expands in place. A container query stacks the cards when the column is under 480px.
+- **Protocol:** the same as the timetable grid. The ops are `add`, `toggle`, `edit`, `repeat`, `move`, `delete` and `reorder`, each with an `opId`. `todos.apply_op` saves them, and they're acknowledged in `data.acked` (`todo_acked` in session state). An `add` carries the new to-do's id, so a resent op adds nothing. The JS calls them "goals" internally (`op.goal`, `section.goals`) from before the split.
+- **Tick animation:** a ticked to-do stays in place for 650 ms (circle fills, title fades and strikes through), then folds into "Completed (n)", collapsed by default.
+- **Editors:** the new-to-do, title and notes boxes are redrawn with their text, caret and focus after every rerun (`restoreEditor`), so typing is never lost.
+
+**Goals:**
+- **Value:** `goals_in` / `get_goal` add `value` (current progress) and `habit` (the linked habit's name). Linked to a habit, `value` is the number of days that habit was ticked within the period; otherwise it's the hand-kept `progress`. Deleting the habit unlinks the goal (back to `progress`).
+- **Goals page:** two bordered sections (Monthly, Yearly), each with ‹ › and a "This month / This year" jump (`goals_start_<period>`). Each goal shows `value / target unit`, a percentage and a bar. Hand-kept goals have − / + (via `add_goal_progress`); every goal has a ⋯ popover to edit it (including the "Update it myself" / "Count a habit's ticks" choice) or delete it. "New goal" is a popover with the same form.
+- **Bars:** HTML in the theme's primary colour (`st.progress` uses a different one), the same on both pages.
+- **Home:** this month's and this year's goals as bars, with "See all" (a button whose callback sets the sidebar radio, `page`).
 
 ## 6. Outlook import (`outlook.py`)
 
@@ -128,7 +141,10 @@ Notes on the schema:
   - `log_day`, `set_habit`, `add_habit`, `list_habits`
   - `add_block`, `update_block`, `delete_block`, `query_blocks`, `query_entries`, `get_stats`
   - `list_categories`, `edit_category`, `set_activity_default`, `set_outlook_category`
-  - `add_goal`, `complete_goal`, `uncomplete_goal`, `list_goals`, `delete_goal` (confirm first). Goals are found by id or title in the current periods: exact title, then part of a title, then the most shared words ("finish problem sheet" → "Problem sheet 4"). Several matches is an error that lists them, so Claude asks.
+  - To-dos: `add_todo`, `complete_todo`, `uncomplete_todo`, `list_todos`, `delete_todo` (confirm first).
+  - Goals: `add_goal`, `log_goal_progress`, `set_goal_progress`, `edit_goal`, `list_goals`, `delete_goal` (confirm first). Progress tools refuse habit-linked goals and point Claude at `set_habit`.
+  - Both are found by id or title in the current periods: exact title, then part of a title, then the most shared words ("finish problem sheet" → "Problem sheet 4"). Several matches is an error that lists them, so Claude asks.
+  - The prompt tells Claude that "today's goals" / "this week's goals" mean to-dos, since goals are only monthly or yearly.
 - **Confirm-first:** anything that deletes data or overwrites/trims other data returns `Result(pending=Pending(summary, run))`. The UI shows Confirm/Cancel, and `run()` re-runs the tool with `confirmed=True` against current data.
 - **Chat UI:** the bar is fixed to the bottom of the main column on every page except Home, where it's an inline box with the latest reply under it and the full history in a pop-up.
 - **Flow:** callbacks set `chat_busy`. `chat.render()` draws first, does the slow work (transcribe, then Claude) and then calls `st.rerun()`, so changes show immediately.
@@ -153,7 +169,8 @@ Notes on the schema:
 
 ## 10. Ideas for later
 
-- Timetable data in CSV export/import (goals have their own CSV).
+- Timetable data in CSV export/import (to-dos and goals have their own CSVs).
+- "Carry over unfinished" for to-dos in the UI (the store function exists).
 - Streaming chat replies.
 - Configurable grid hours (currently fixed at 07:00–01:00).
 - Signing and notarising Arete.app.

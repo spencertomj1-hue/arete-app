@@ -25,7 +25,7 @@ svg { display: block; }
   gap: 12px;
   align-items: start;
 }
-@container (max-width: 560px) { .gl-grid { grid-template-columns: minmax(0, 1fr); } }
+@container (max-width: 480px) { .gl-grid { grid-template-columns: minmax(0, 1fr); } }
 
 .gl-card {
   padding: 14px 14px 10px;

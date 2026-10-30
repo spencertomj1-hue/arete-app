@@ -6,7 +6,7 @@
 
 <p align="center">
   A personal life tracker for your Mac: a weekly Plan-vs-Actual timetable, a daily log
-  of mood, sleep and energy, habits with streaks, goals, and a Claude chat box that updates it all for you.
+  of mood, sleep and energy, habits with streaks, to-dos and goals, and a Claude chat box that updates it all for you.
 </p>
 
 <p align="center"><em>No summit, just the climb.</em></p>
@@ -38,12 +38,15 @@ It runs entirely on your Mac as a normal app. It's built with [Streamlit](https:
 
 ## Features
 
-**Home.** Today's agenda and timetable on the left. On the right, the box to ask Claude, with today's, this week's and this month's goals underneath.
+**Home.** Today's agenda and timetable on the left. On the right: the box to ask Claude, your to-dos, and your goals' progress bars.
 
-**Goals.** To-do lists for the day, the week (Monday to Sunday), the month and the year, in the style of Apple Reminders.
-- **Ticking off:** click the circle; the goal moves into a folded "Completed" section. Click it again to untick.
-- **Adding and editing:** click "New goal", type, and press Enter (it stays open for the next one; Esc cancels). Click a title to edit it, drag to reorder, and right-click for notes, repeat, moving to another period, or delete.
-- **Periods:** ‹ › moves each list to other days, weeks, months or years. "Carry over unfinished" copies unticked goals into the next period, and repeating goals get a fresh copy every new period.
+**To-dos (on Home).** Today's, this week's and this month's to-do lists, side by side, in the style of Apple Reminders.
+- **Ticking off:** click the circle; the to-do moves into a folded "Completed" section. Click it again to untick.
+- **Adding and editing:** click "New to-do", type, and press Enter (it stays open for the next one; Esc cancels). Click a title to edit it, drag to reorder, and right-click for notes, repeat, moving to another list, or delete. Repeating to-dos get a fresh copy every new day, week or month.
+
+**Goals.** Measurable targets for the month or the year, like "Gym: 12 sessions" or "Read 20 books", each with a progress bar (on the Goals page and on Home).
+- **Progress:** either update it yourself (− / + or type a number), or link the goal to a habit and every day you tick that habit counts.
+- **Moving around:** ‹ › shows other months and years.
 
 **Weekly timetable.**
 - **Layout:** a calendar-style week. Each day has a **Plan** column (what you intended) and an **Actual** column (what really happened), in 30-minute slots from 07:00 to 01:00. Anything after midnight counts as the previous day.
@@ -62,8 +65,10 @@ It runs entirely on your Mac as a normal app. It's built with [Streamlit](https:
 > "Plan a lecture 9 till 11 tomorrow"
 > "Mood 4 today, slept 7 and a half hours, tick reading"
 > "How much did I actually study this week?"
-> "Add go gym to this week's goals"
+> "Add go gym to this week's to-dos"
 > "Tick off finish problem sheet"
+> "Set a goal of 12 gym sessions this month, counting my gym habit"
+> "I read 2 more books"
 
 Claude only changes Arete's data, through a fixed set of actions. **Anything that deletes or overwrites data shows a preview with Confirm / Cancel first.** Voice input is transcribed **on your Mac**.
 
@@ -73,7 +78,7 @@ Claude only changes Arete's data, through a fixed set of actions. **Anything tha
 - Calendar connection
 - Claude sign-in status
 - Microphone test
-- Backups, CSV export/import (with a separate goals CSV) and the data folder
+- Backups, CSV export/import (with separate to-do and goal CSVs) and the data folder
 
 ## Screenshots
 

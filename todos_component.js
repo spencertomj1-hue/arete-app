@@ -228,8 +228,8 @@ class GoalLists {
       <ul class="gl-list" data-list="${sec.period}">${shown.map((g) => this.rowHtml(g)).join("")}</ul>
       ${hidden > 0 ? `<button class="gl-link gl-more" data-more>${hidden} more</button>` : ""}
       ${adding ? `<div class="gl-add editing"><span class="gl-tick ghost"></span>
-          <input class="gl-input" data-editor placeholder="New goal" aria-label="New goal"></div>`
-               : `<button class="gl-add" data-add>${ICONS.plus}<span>New goal</span></button>`}
+          <input class="gl-input" data-editor placeholder="New to-do" aria-label="New to-do"></div>`
+               : `<button class="gl-add" data-add>${ICONS.plus}<span>New to-do</span></button>`}
       ${done.length ? `
         <button class="gl-done-head${open ? " open" : ""}" data-toggle-done>${ICONS.chevron}Completed (${done.length})</button>
         ${open ? `<ul class="gl-list gl-done-list">${done.map((g) => this.rowHtml(g)).join("")}</ul>` : ""}` : ""}
@@ -240,7 +240,7 @@ class GoalLists {
     const ed = this.editing && this.editing.id === g.id ? this.editing.kind : null;
     const state = this.completing.get(g.id);
     const title = ed === "title"
-      ? `<input class="gl-input" data-editor aria-label="Goal title">`
+      ? `<input class="gl-input" data-editor aria-label="To-do title">`
       : `<span class="gl-title" data-title>${esc(g.title)}</span>`;
     const notes = ed === "notes"
       ? `<input class="gl-input gl-notes-input" data-editor placeholder="Notes" aria-label="Notes">`
