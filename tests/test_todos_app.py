@@ -94,4 +94,4 @@ def test_home_habits_tick_today(store):
     assert not at.exception
     assert date.today().isoformat() in store.get_habit_dates(hid)
     at.button(key="home_habits_manage").click().run()
-    assert at.sidebar.radio[0].value == "Habits"
+    assert at.sidebar.radio[0].value == "Daily Log"

@@ -208,10 +208,9 @@ if settings_ui.needs_wizard():
 
 PAGES = {
     "Home": page_home,
-    goals.PAGE: goals.render_page,
     "Timetable": timetable.render_page,
-    "Daily log": daily_log.page_daily_log,
-    "Habits": daily_log.page_habits,
+    goals.PAGE: goals.render_page,
+    daily_log.PAGE: daily_log.page_daily_log,
     "Stats": page_stats,
     "Settings": settings_ui.page_settings,
 }

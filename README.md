@@ -54,9 +54,7 @@ It runs entirely on your Mac as a normal app. It's built with [Streamlit](https:
 - **Categories:** colour-coded, with groups "Life" and "Work" to start with. Activities pick their category automatically (for example "Lunch" → Meals). You can change categories and colours by asking Claude.
 - **Moving around:** use ‹ Today › or a date picker, or swipe sideways on the trackpad.
 
-**Daily log.** A month calendar showing each day's mood, sleep and energy. Click a day to read its notes, and save entries below.
-
-**Habits.** Tick them off each day and see your current and best streaks.
+**Daily Log.** A month calendar showing each day's mood, sleep and energy. Click a day to read its notes, tick that day's habits (with current and best streaks), and save its entry. Habits are added and removed here too.
 
 **Stats.** Charts of mood, energy and sleep, plus habit completion rates.
 

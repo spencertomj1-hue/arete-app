@@ -1,5 +1,5 @@
 """
-Daily log and Habits pages.
+Daily Log page (the day's log and habits) and Home's habits.
 
 Daily log: a month calendar (calendar_component.js/.css) showing each day's
 mood, sleep and energy; clicking a day shows its notes, and the form below
@@ -50,8 +50,11 @@ def _on_month():
     st.session_state["log_month"] = shifted.replace(day=1)
 
 
+PAGE = "Daily Log"      # sidebar label (also what Home's habits "Manage" switches to)
+
+
 def page_daily_log():
-    st.header("Daily log")
+    st.header("Daily Log")
     today = date.today()
     selected = st.session_state.setdefault("log_day", today)
     month = st.session_state.setdefault("log_month", today.replace(day=1))
@@ -83,6 +86,8 @@ def page_daily_log():
             st.markdown(entry["notes"] if entry.get("notes") else "*No notes.*")
         else:
             st.caption("Nothing logged for this day yet.")
+
+    _habits_for(selected, today)
 
     # --- Save an entry for the selected day ---
     if selected > today:
@@ -117,7 +122,7 @@ def _toggle_habit(habit_id, day, key):
 
 
 def _open_habits():
-    st.session_state["page"] = "Habits"     # the sidebar radio's key; button callbacks run before it's drawn
+    st.session_state["page"] = PAGE         # the sidebar radio's key; button callbacks run before it's drawn
 
 
 def render_home_habits():
@@ -131,7 +136,7 @@ def render_home_habits():
 
     habits = store.get_habits()
     if not habits:
-        st.caption("No habits yet. Add some on the Habits page.")
+        st.caption("No habits yet. Add some on the Daily Log page.")
         return
     st.html(f"""<style>
       .hb-week {{ display: flex; gap: 4px; justify-content: flex-end; }}
@@ -153,20 +158,19 @@ def render_home_habits():
         streak.caption(f":material/local_fire_department: {current}" if current else "–")   # current streak
 
 
-def page_habits():
-    st.header("Habits")
-    day = st.date_input("Day", value=date.today(), max_value=date.today(), format="DD/MM/YYYY")
+def _habits_for(day, today):
+    """The selected day's habits to tick (not for future days), with streaks, and adding/removing habits."""
+    st.subheader("Habits")
     d = day.isoformat()
-
     habits = store.get_habits()
     if not habits:
-        st.info("No habits yet — add one below.")
+        st.caption("No habits yet. Add one below.")
     for habit_id, name in habits:
         done_dates = store.get_habit_dates(habit_id)
         current, best = store.streaks(done_dates)
         key = f"habit_{habit_id}_{d}"
         left, right = st.columns([3, 2])
-        left.checkbox(name, value=d in done_dates, key=key,
+        left.checkbox(name, value=d in done_dates, key=key, disabled=day > today,
                       on_change=_toggle_habit, args=(habit_id, d, key))
         right.caption(f"{current}-day streak · best {best}")
 

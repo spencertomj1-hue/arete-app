@@ -69,7 +69,7 @@ def _goal_form(key, goal=None):
     habit_id = None
     if how == BY_HABIT:
         if not habits:
-            st.caption("You have no habits yet. Add one on the Habits page, or update this goal yourself.")
+            st.caption("You have no habits yet. Add one on the Daily Log page, or update this goal yourself.")
             return None
         ids = list(habits)
         habit_id = st.selectbox("Habit", ids, format_func=habits.get, key=f"{key}_habit",
