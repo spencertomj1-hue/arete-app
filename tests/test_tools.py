@@ -1,0 +1,198 @@
+"""The assistant's tools (tools.py), run against a throwaway database."""
+
+import importlib
+from datetime import date
+
+import pytest
+
+
+@pytest.fixture
+def tools(store):
+    import tools as tools_module
+    return importlib.reload(tools_module)   # picks up the reloaded store
+
+
+DAY = "2026-10-29"
+
+
+def blocks(store, track="plan", day=DAY):
+    return [(b["start"], b["end"], b["label"], b["category_id"]) for b in store.blocks_between(day, day, track)]
+
+
+# --- log_day ---
+
+def test_log_day_new_entry_saves_straight_away(tools, store):
+    r = tools.log_day(DAY, mood=4, sleep=7.5)
+    assert r.changed and r.pending is None
+    assert store.get_entry(DAY)["mood"] == 4 and store.get_entry(DAY)["sleep"] == 7.5
+
+
+def test_log_day_keeps_untouched_fields(tools, store):
+    tools.log_day(DAY, mood=4, sleep=7.5, notes="ok")
+    tools.log_day(DAY, energy=3)
+    e = store.get_entry(DAY)
+    assert (e["mood"], e["sleep"], e["energy"], e["notes"]) == (4, 7.5, 3, "ok")
+
+
+def test_log_day_overwrite_needs_confirm(tools, store):
+    tools.log_day(DAY, mood=4)
+    r = tools.log_day(DAY, mood=2)
+    assert r.pending and "mood 4 → 2" in r.pending.summary
+    assert store.get_entry(DAY)["mood"] == 4           # not applied yet
+    done = r.pending.run()
+    assert done.changed and store.get_entry(DAY)["mood"] == 2
+
+
+def test_log_day_append_notes_needs_no_confirm(tools, store):
+    tools.log_day(DAY, notes="Gym")
+    r = tools.log_day(DAY, notes="Cinema", append_notes=True)
+    assert r.pending is None
+    assert store.get_entry(DAY)["notes"] == "Gym\nCinema"
+
+
+def test_log_day_replacing_notes_needs_confirm(tools, store):
+    tools.log_day(DAY, notes="Gym")
+    assert tools.log_day(DAY, notes="Cinema").pending
+
+
+def test_log_day_validation(tools):
+    with pytest.raises(tools.ToolError):
+        tools.log_day(DAY, mood=7)
+    with pytest.raises(tools.ToolError):
+        tools.log_day("tomorrow", mood=3)
+    with pytest.raises(tools.ToolError):
+        tools.log_day(DAY)
+
+
+# --- habits ---
+
+def test_habits(tools, store):
+    assert tools.add_habit("Read").changed
+    assert "already exists" in tools.add_habit("read").text
+    r = tools.set_habit(DAY, "READ", True)
+    assert r.changed and DAY in store.get_habit_dates(store.find_habit("Read")[0])
+    assert "already ticked" in tools.set_habit(DAY, "Read", True).text
+    # Unticking deletes data, so it needs a confirm.
+    r = tools.set_habit(DAY, "Read", False)
+    assert r.pending and DAY in store.get_habit_dates(store.find_habit("Read")[0])
+    r.pending.run()
+    assert DAY not in store.get_habit_dates(store.find_habit("Read")[0])
+
+
+def test_unknown_habit_is_an_error(tools):
+    with pytest.raises(tools.ToolError, match="Ask the user"):
+        tools.set_habit(DAY, "Meditate", True)
+
+
+def test_list_habits(tools):
+    tools.add_habit("Read")
+    tools.set_habit("2026-10-28", "Read", True)
+    tools.set_habit("2026-10-29", "Read", True)
+    assert "current streak 2" in tools.list_habits(today=date(2026, 10, 29)).text
+
+
+# --- timetable ---
+
+def test_add_block_picks_category_from_label_map(tools, store):
+    r = tools.add_block(DAY, "plan", "09:00", "11:00", "Lecture")
+    assert r.changed and r.pending is None
+    assert blocks(store) == [("09:00", "11:00", "Lecture", "classes")]
+
+
+def test_add_block_explicit_category_name(tools, store):
+    tools.add_block(DAY, "actual", "18:00", "20:00", "Five-a-side", category="exercise")
+    assert blocks(store, "actual") == [("18:00", "20:00", "Five-a-side", "exercise")]
+
+
+def test_add_block_unknown_category_asks(tools):
+    with pytest.raises(tools.ToolError, match="Ask the user"):
+        tools.add_block(DAY, "plan", "09:00", "10:00", "Piano")
+
+
+def test_add_block_overlap_needs_confirm_and_splits(tools, store):
+    tools.add_block(DAY, "plan", "07:00", "10:00", "Sleep")
+    r = tools.add_block(DAY, "plan", "08:00", "08:30", "Breakfast", category="Meals")
+    assert r.pending and "Sleep" in r.pending.summary
+    assert blocks(store) == [("07:00", "10:00", "Sleep", "sleep")]       # untouched until confirmed
+    r.pending.run()
+    assert blocks(store) == [("07:00", "08:00", "Sleep", "sleep"), ("08:00", "08:30", "Breakfast", "meals"),
+                             ("08:30", "10:00", "Sleep", "sleep")]
+
+
+def test_add_block_extending_same_block_needs_no_confirm(tools, store):
+    tools.add_block(DAY, "plan", "07:00", "08:00", "Sleep")
+    r = tools.add_block(DAY, "plan", "08:00", "09:00", "Sleep")
+    assert r.pending is None
+    assert blocks(store) == [("07:00", "09:00", "Sleep", "sleep")]
+
+
+def test_add_block_after_midnight_and_time_rules(tools, store):
+    tools.add_block(DAY, "actual", "23:30", "01:00", "Sleep")
+    assert blocks(store, "actual") == [("23:30", "01:00", "Sleep", "sleep")]
+    for start, end in (("06:00", "07:00"), ("09:15", "10:00"), ("10:00", "09:00"), ("00:30", "01:30")):
+        with pytest.raises(tools.ToolError):
+            tools.add_block(DAY, "plan", start, end, "Sleep")
+    with pytest.raises(tools.ToolError):
+        tools.add_block(DAY, "maybe", "09:00", "10:00", "Sleep")
+
+
+def test_update_block_relabel_and_move(tools, store):
+    tools.add_block(DAY, "plan", "09:00", "11:00", "Lecture")
+    tools.add_block(DAY, "plan", "12:00", "13:00", "Lunch")
+    bid = store.blocks_between(DAY, DAY, "plan")[0]["id"]
+
+    r = tools.update_block(bid, label="Homework")
+    assert r.pending                                   # always previewed
+    r.pending.run()
+    assert blocks(store)[0] == ("09:00", "11:00", "Homework", "study")   # label map picked Study
+
+    r = tools.update_block(bid, start="11:30", end="12:30")
+    assert "overwrites" in r.pending.summary and "Lunch" in r.pending.summary
+    r.pending.run()
+    assert blocks(store) == [("11:30", "12:30", "Homework", "study"), ("12:30", "13:00", "Lunch", "meals")]
+
+
+def test_delete_block(tools, store):
+    tools.add_block(DAY, "plan", "09:00", "11:00", "Lecture")
+    bid = store.blocks_between(DAY, DAY)[0]["id"]
+    r = tools.delete_block(bid)
+    assert r.pending and blocks(store)
+    r.pending.run()
+    assert blocks(store) == []
+    with pytest.raises(tools.ToolError):
+        tools.delete_block(bid)
+
+
+def test_queries(tools):
+    tools.add_block(DAY, "plan", "09:00", "11:00", "Lecture")
+    tools.log_day(DAY, mood=4, notes="good")
+    tools.add_habit("Read")
+    tools.set_habit(DAY, "Read", True)
+    assert "Lecture (Classes)" in tools.query_blocks("2026-10-26", "2026-11-01").text
+    assert "No timetable blocks" in tools.query_blocks("2026-10-26", "2026-11-01", track="actual").text
+    q = tools.query_entries("2026-10-26", "2026-11-01").text
+    assert "mood 4" in q and "habits: Read" in q
+    s = tools.get_stats("7d", today=date(2026, 10, 29)).text
+    assert "mood 4.0" in s and "Classes 2h" in s
+    assert "Life:" in tools.list_categories().text
+    with pytest.raises(tools.ToolError):
+        tools.get_stats("fortnight")
+
+
+def test_edit_category_and_activity_default(tools, store):
+    assert tools.edit_category("exercise", colour="#1b7f3b").changed
+    cats = {r["name"]: r for r in store.load_categories().to_dict("records")}
+    assert cats["Exercise"]["colour"] == "#1B7F3B"
+    assert tools.edit_category("Exercise", new_name="Workout").changed
+    assert "Workout" in set(store.load_categories()["name"])
+    with pytest.raises(tools.ToolError, match="hex"):
+        tools.edit_category("Workout", colour="green")
+    with pytest.raises(tools.ToolError, match="create=true"):
+        tools.edit_category("Piano")
+    assert tools.edit_category("Piano", colour="#AA00AA", group="life", create=True).changed
+    assert store.resolve_category(category="Piano") == "piano"
+
+    assert tools.set_activity_default("Scales", "Piano").changed
+    assert store.resolve_category(label="scales") == "piano"
+    tools.add_block("2026-10-29", "plan", "18:00", "19:00", "Scales")
+    assert store.blocks_between("2026-10-29", "2026-10-29")[0]["category_id"] == "piano"

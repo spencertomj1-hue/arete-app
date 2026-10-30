@@ -1,0 +1,14 @@
+# Arete runs locally only.
+
+[server]
+address = "127.0.0.1"          # only this Mac can connect
+enableXsrfProtection = true    # (Streamlit's default, set explicitly)
+enableCORS = true
+headless = true
+
+[browser]
+gatherUsageStats = false       # no usage statistics sent to Streamlit
+
+[client]
+# A desktop app: no Deploy button, developer menu or running indicator.
+toolbarMode = "minimal"

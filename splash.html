@@ -1,0 +1,54 @@
+<!doctype html>
+<!-- Loading screen shown by desktop.py while the app starts. {{LOGO}} is replaced with the logo as a data URI. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Arete</title>
+<style>
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: #ffffff;
+    overflow: hidden;
+    cursor: default;
+    user-select: none;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 34px;
+    transition: opacity 0.4s ease;
+  }
+  body.out { opacity: 0; }
+
+  img {
+    height: min(42vh, 380px);
+    animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  /* Didot ships with macOS: a high-contrast classical serif that suits the Greek bust. */
+  p {
+    margin: 0;
+    font-family: "Didot", "Bodoni 72", "Bodoni MT", "Times New Roman", serif;
+    font-style: italic;
+    font-size: clamp(22px, 3.2vw, 34px);
+    letter-spacing: 0.04em;
+    color: #2b2b2b;
+    animation: rise 0.9s 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  .error { font-family: -apple-system, sans-serif; font-style: normal; font-size: 15px; color: #c0392b; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+  <img src="{{LOGO}}" alt="Arete">
+  <p id="motto">No summit, just the climb.</p>
+</body>
+</html>

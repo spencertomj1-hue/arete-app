@@ -1,0 +1,40 @@
+# Only source code goes to git. All user data lives in ~/Library/Application Support/Arete
+# (outside this folder); these rules are a second line of defence.
+
+# --- Databases (and SQLite's journal/WAL/SHM files) ---
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+
+# --- Calendars, spreadsheets and exports (test fixtures are fake and allowed) ---
+*.ics
+*.xlsx
+*.xls
+*.csv
+!tests/fixtures/*.ics
+!tests/fixtures/*.csv
+
+# --- Secrets and local settings ---
+.env
+.env.*
+.streamlit/secrets.toml
+arete_config.json
+settings.json
+backups/
+
+# --- Voice recordings ---
+*.wav
+*.aiff
+*.mp3
+*.m4a
+
+# --- Logs and caches ---
+*.log
+logs/
+.cache/
+.venv/
+__pycache__/
+.pytest_cache/
+static/
+.DS_Store

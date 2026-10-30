@@ -1,0 +1,7 @@
+# For the pre-commit framework (https://pre-commit.com): `pre-commit install`.
+# Same check as scripts/install-hooks.sh: gitleaks blocks commits containing secrets.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

@@ -1,0 +1,308 @@
+/* Weekly Timetable — calendar-style week view using the app's font and theme. */
+
+.tt-root {
+  --line: rgba(128, 128, 128, 0.22);        /* hour lines */
+  --line-soft: rgba(128, 128, 128, 0.11);   /* half-hour lines, Plan|Actual split */
+  --line-day: rgba(128, 128, 128, 0.38);    /* between days */
+  --text: var(--st-text-color, #31333f);
+  --bg: var(--st-background-color, #fff);
+  --head-bg: var(--st-secondary-background-color, #f6f7f9);
+  --muted: rgba(128, 128, 128, 0.95);
+  --accent: var(--st-primary-color, #ff4b4b);
+  --radius: var(--st-base-radius, 0.5rem);
+  font: inherit;
+  color: var(--text);
+}
+
+button, input, select { font: inherit; }
+
+/* ---------- Header: week title, navigation, label + eraser ---------- */
+
+.tt-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.tt-title { font-size: 1.45rem; font-weight: 600; letter-spacing: -0.01em; margin-right: 6px; }
+.tt-nav { display: inline-flex; border: 1px solid rgba(128, 128, 128, 0.35); border-radius: 999px; overflow: hidden; }
+.tt-nav button {
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.tt-nav button + button { border-left: 1px solid rgba(128, 128, 128, 0.35); }
+.tt-nav button[data-nav="-1"], .tt-nav button[data-nav="1"] { font-size: 1.05rem; line-height: 1; padding: 2px 11px 4px; }
+.tt-nav button:hover { background: rgba(128, 128, 128, 0.1); }
+.tt-goto {
+  padding: 3px 8px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.78rem;
+}
+.tt-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+
+/* ---------- Legend / brush picker (one line) ---------- */
+
+/* Always one line; if the window is too narrow it scrolls sideways instead of wrapping. */
+.tt-legend {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tt-legend::-webkit-scrollbar { display: none; }
+
+.sw {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.76rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.sw i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.sw:hover { background: rgba(128, 128, 128, 0.1); }
+.sw.on { background: rgba(128, 128, 128, 0.16); border-color: rgba(128, 128, 128, 0.35); font-weight: 600; }
+.sw.eraser { border: 1px dashed rgba(128, 128, 128, 0.5); }
+.sep { flex: none; width: 1px; height: 16px; margin: 0 5px; background: var(--line-day); }
+
+.tt-label {
+  width: 11.5em;
+  padding: 4px 10px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.78rem;
+  outline: none;
+}
+.tt-label:focus { border-color: var(--accent); }
+
+.tt-hint { margin-top: 6px; font-size: 0.72rem; color: var(--muted); }
+.tt-hint.warn { color: #d33; }
+
+/* ---------- Week grid ---------- */
+
+.tt-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  user-select: none;
+  overscroll-behavior-x: contain;   /* sideways swipes change week, not browser history */
+}
+.tt-wrap { position: relative; }
+
+table.tt {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+col.c-time { width: 52px; }
+
+/* Header */
+table.tt th {
+  background: var(--head-bg);
+  color: var(--text);
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+th.day { padding: 7px 4px 2px; border-left: 1px solid var(--line-day); }
+th.day .dn { font-size: 0.8rem; }
+th.day .dd { font-size: 0.7rem; font-weight: 400; color: var(--muted); }
+th.day.today { box-shadow: inset 0 2px 0 var(--accent); }
+th.day.today .dn, th.day.today .dd { color: var(--accent); }
+th.sub {
+  padding: 1px 2px 5px;
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+th.sub.first { border-left: 1px solid var(--line-day); }
+th.h-time { border-bottom: 1px solid var(--line); }
+
+/* Body: each cell draws its bottom line and a left line between columns. */
+table.tt td {
+  height: var(--row-h, 18px);   /* Home shrinks this to fit the window */
+  padding: 0;
+  border-bottom: 1px dashed var(--line-soft);
+}
+tr.half td { border-bottom: 1px solid var(--line); }      /* the line on each hour */
+tr:last-child td { border-bottom: none; }
+
+/* Time labels sit centred on their hour line. */
+td.t { position: relative; overflow: visible; border-bottom-color: transparent !important; }
+td.t span {
+  position: absolute;
+  right: 8px;
+  top: 0;
+  transform: translateY(-50%);
+  font-size: 0.66rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  background: var(--bg);
+  padding: 0 2px;
+  line-height: 1;
+}
+tr:first-child td.t span { transform: translateY(3px); }  /* first label below the header */
+
+td.s { border-left: 1px solid var(--line-soft); cursor: cell; }
+td.s.first { border-left: 1px solid var(--line-day); }
+td.s.today { background: rgba(128, 128, 128, 0.045); }
+td.s:hover:not(.filled) { background: rgba(128, 128, 128, 0.12); }
+td.s.sel { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+
+/* Blocks, drawn over the cells (clicks pass through to the cells below). */
+.tt-blocks { position: absolute; inset: 0; pointer-events: none; }
+.blk {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 2px 6px;
+  border: 1.5px solid var(--bg);           /* gap around each block */
+  border-radius: 7px;
+  background-clip: padding-box;
+  overflow: hidden;
+  line-height: 1.2;
+  transition: opacity 0.12s;
+}
+.blk b, .blk span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blk b { font-size: 0.7rem; font-weight: 600; }
+.blk span { font-size: 0.62rem; opacity: 0.8; font-variant-numeric: tabular-nums; }
+.blk:not(.tall) { justify-content: center; padding-top: 0; padding-bottom: 0; }
+.dragging .blk { opacity: 0.35; }
+
+/* ---------- Right-click editor ---------- */
+
+.tt-pop {
+  position: fixed;
+  z-index: 1000;
+  display: grid;
+  gap: 8px;
+  min-width: 250px;
+  padding: 12px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  font-size: 0.85rem;
+}
+.tt-pop input, .tt-pop select, .tt-pop button {
+  padding: 5px 9px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: calc(var(--radius) * 0.7);
+  background: var(--bg);
+  color: var(--text);
+}
+.tt-pop button { cursor: pointer; }
+.tt-pop .row { display: flex; gap: 6px; }
+.tt-pop .del { color: #d33; margin-right: auto; }
+.tt-pop .save { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* One-day mode (Home page): no week navigation. */
+.tt-root.single .tt-nav, .tt-root.single .tt-goto { display: none; }
+
+/* View-only mode (Home page): same look, no editing. The legend is just a key. */
+.tt-root.readonly .tt-tools, .tt-root.readonly .tt-hint { display: none; }
+.tt-root.readonly .sw { pointer-events: none; }
+.tt-root.readonly .sw.on { background: transparent; border-color: transparent; font-weight: inherit; }
+.tt-root.readonly td.s { cursor: default; }
+.tt-root.readonly td.s:hover:not(.filled) { background: transparent; }
+.tt-root.readonly td.s.today:hover:not(.filled) { background: rgba(128, 128, 128, 0.045); }
+
+/* Home: the key sits under the grid and wraps, so every category is visible without scrolling. */
+.tt-root.readonly { display: flex; flex-direction: column; }
+.tt-root.readonly .tt-head { order: 0; }
+.tt-root.readonly .tt-card { order: 1; }
+.tt-root.readonly .tt-legend { order: 2; flex-wrap: wrap; overflow: visible; row-gap: 2px; margin: 10px 0 0; }
+.tt-root.readonly .tt-legend .sep { display: none; }   /* the group divider looks stray once the key wraps */
+
+/* ---------- Outlook (read-only events) ---------- */
+
+/* Sync button, last-synced note and show/hide toggle, next to the title. */
+.tt-outlook { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--muted); }
+.tt-sync, .tt-ol-toggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid rgba(128, 128, 128, 0.35); border-radius: 999px;
+  background: transparent; color: var(--text); cursor: pointer;
+}
+.tt-sync { width: 28px; height: 28px; justify-content: center; padding: 0; }
+.tt-ol-toggle { padding: 3px 10px; font-size: 0.75rem; opacity: 0.55; }
+.tt-ol-toggle.on { opacity: 1; background: rgba(128, 128, 128, 0.12); }
+.tt-sync:hover, .tt-ol-toggle:hover { background: rgba(128, 128, 128, 0.1); }
+.msr {   /* Streamlit's Material Symbols font, loaded on the page */
+  font-family: "Material Symbols Rounded"; font-size: 18px; line-height: 1;
+  font-feature-settings: "liga"; -webkit-font-feature-settings: "liga";
+}
+.tt-sync.spin .msr { animation: tt-spin 0.9s linear infinite; }
+@keyframes tt-spin { to { transform: rotate(-360deg); } }
+.tt-synced.warn { color: #d33; }
+.cal-ic { width: 12px; height: 12px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+/* Outlook blocks: solid like the user's own (Uni blue), with a small calendar icon; drawn on top. */
+.blk.outlook { z-index: 1; }
+.blk.outlook b { display: inline-flex; align-items: center; gap: 4px; }
+
+/* All-day Outlook events: chips in the day header. */
+th.day .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin-top: 3px; }
+th.day .chips:empty { display: none; }
+th.day .chip {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  padding: 1px 7px; border-radius: 999px;
+  border: 1px dashed rgba(128, 128, 128, 0.6);
+  font-size: 0.62rem; font-weight: 500; color: var(--text);
+}
+
+/* Read-only info card on right-click. */
+.tt-pop.outlook-info .ol-title { display: flex; align-items: center; gap: 6px; }
+.tt-pop.outlook-info .ol-note { font-size: 0.75rem; color: var(--muted); }
+.tt-title, .tt-synced { white-space: nowrap; }
+
+/* Home (view only, one day): the title already says which day, so the header keeps
+   just PLAN / ACTUAL (and any all-day chips), leaving more room for the rows. */
+.tt-root.readonly th.day { padding-top: 3px; }
+.tt-root.readonly th.day .dn, .tt-root.readonly th.day .dd { display: none; }
+.tt-root.readonly .tt-head { margin-bottom: 4px; }
+.tt-root.readonly .tt-title { font-size: 1.2rem; }
+.blk:not(.tall) b { line-height: 1; }
+
+/* Clicked block: grows slightly while its details card is open. */
+.blk { transition: transform 0.12s ease, box-shadow 0.12s ease; transform-origin: center left; }
+.blk.focus { transform: scale(1.05); z-index: 5; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28); }
+
+/* Details card (Outlook-style peek). */
+.tt-pop.tt-peek { width: 280px; min-width: 0; gap: 5px; }
+.tt-peek .pk-title { display: flex; align-items: flex-start; gap: 6px; font-size: 0.95rem; }
+.tt-peek .pk-title .cal-ic { margin-top: 4px; }
+.tt-peek .pk-when { font-size: 0.85rem; }
+.tt-peek .pk-meta, .tt-peek .pk-loc { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--muted); }
+.tt-peek .pk-meta i { width: 10px; height: 10px; border-radius: 3px; }
+.tt-peek .pk-text { font-size: 0.82rem; line-height: 1.4; max-height: 8.5em; overflow: auto;
+                    padding-top: 6px; border-top: 1px solid var(--line); }
+.tt-peek .row { justify-content: flex-end; margin-top: 4px; }
+.tt-pop .p-details { resize: vertical; font-size: 0.85rem; }
