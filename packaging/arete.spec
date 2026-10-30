@@ -1,14 +1,19 @@
-# PyInstaller recipe for the Windows app: builds dist/Arete/Arete.exe (a folder
-# with Python and every package inside, so nothing else needs installing).
-# Run on Windows from the project folder:
+# PyInstaller recipe for the packaged app, with Python and every package inside
+# (so nothing else needs installing):
+#   Windows: dist/Arete/Arete.exe   -> wrapped into Arete-Setup.exe by Inno Setup (packaging/arete.iss)
+#   macOS:   dist/Arete.app         -> wrapped into Arete.dmg with hdiutil
+# Run on that system, from the project folder:
 #   pyinstaller packaging/arete.spec --noconfirm
-# The GitHub workflow .github/workflows/release.yml does this, then wraps the
-# folder into Arete-Setup.exe with Inno Setup (packaging/arete.iss).
+# The GitHub workflow .github/workflows/release.yml does all of this.
+import os
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 ROOT = Path(SPECPATH).parent
+MAC = sys.platform == "darwin"
+VERSION = os.environ.get("ARETE_VERSION", "0.0.0")
 
 datas = [
     (str(ROOT / "app.py"), "."),                                     # Streamlit runs it as a file
@@ -43,7 +48,25 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="Arete",
-    icon=str(ROOT / "assets" / "icon.ico"),
+    icon=str(ROOT / "assets" / ("Arete.icns" if MAC else "icon.ico")),
     console=False,                 # a normal windowed app; output goes to the data folder's logs/
 )
 coll = COLLECT(exe, a.binaries, a.datas, name="Arete")
+
+if MAC:
+    app = BUNDLE(
+        coll,
+        name="Arete.app",
+        icon=str(ROOT / "assets" / "Arete.icns"),
+        bundle_identifier="local.arete",
+        version=VERSION,
+        info_plist={
+            "CFBundleName": "Arete",
+            "CFBundleDisplayName": "Arete",
+            "CFBundleShortVersionString": VERSION,
+            "LSMinimumSystemVersion": "11.0",
+            "NSHighResolutionCapable": True,
+            "NSMicrophoneUsageDescription":
+                "Arete records your voice when you click the mic in the chat bar, and transcribes it on this Mac.",
+        },
+    )

@@ -22,8 +22,6 @@ import sys
 import time
 from pathlib import Path
 
-import webview
-
 FROZEN = getattr(sys, "frozen", False)          # running as the packaged Arete.exe
 APP_DIR = Path(sys._MEIPASS) if FROZEN else Path(__file__).parent
 ICON = APP_DIR / "assets" / "icon.png"   # built by scripts/make_icon.py
@@ -115,6 +113,8 @@ def wait_for_server(port, timeout=30):
 
 
 def main():
+    import webview            # only the window process needs the GUI toolkit (not --serve / --check)
+
     port = free_port()
 
     # Start Streamlit in the background without opening a browser tab (or, on
