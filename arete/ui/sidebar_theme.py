@@ -1,5 +1,5 @@
 """
-The sidebar's look: a marble background (Images/sidebar.webp) behind a narrow
+The sidebar's look: a marble background (assets/sidebar.webp) behind a narrow
 menu with a small box round each item, so the veins never run through the text.
 
 The image is embedded in the CSS as a data URI (read once at import), so no
@@ -11,7 +11,7 @@ from pathlib import Path
 
 import streamlit as st
 
-_IMAGE = base64.b64encode((Path(__file__).parent / "Images" / "sidebar.webp").read_bytes()).decode()
+_IMAGE = base64.b64encode((Path(__file__).parents[2] / "assets" / "sidebar.webp").read_bytes()).decode()
 
 
 def apply():

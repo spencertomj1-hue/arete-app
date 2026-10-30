@@ -13,15 +13,15 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-import chat
-import daily_log
-import goals
-import todos
-import network
-import settings_ui
-import store
-import timetable
-from store import entries_between, get_stats, init_db
+from arete.ui import chat
+from arete.ui import daily_log
+from arete.ui import goals
+from arete.ui import todos
+from arete.ui import network
+from arete.ui import settings_ui
+from arete import store
+from arete.ui import timetable
+from arete.store import entries_between, get_stats, init_db
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ def page_stats():
 # App entry point
 # ---------------------------------------------------------------------------
 
-st.set_page_config(page_title="Arete", page_icon=str(Path(__file__).parent / "Images" / "Logo.jpg"), layout="wide")
+st.set_page_config(page_title="Arete", page_icon=str(Path(__file__).parent / "assets" / "Logo.jpg"), layout="wide")
 
 # All of the app's own CSS goes out first, so nothing jumps around as the page draws:
 # the same top padding on every page, the sidebar nav restyled as large full-width
@@ -194,7 +194,7 @@ st.html(f"""<style>
 </style>""")
 
 
-import sidebar_theme          # the marble sidebar and its boxed menu
+from arete.ui import sidebar_theme          # the marble sidebar and its boxed menu
 sidebar_theme.apply()
 
 

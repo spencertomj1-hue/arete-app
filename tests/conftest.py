@@ -17,7 +17,7 @@ def store(tmp_path, monkeypatch):
     data = tmp_path / "data"
     monkeypatch.setenv("ARETE_DATA_DIR", str(data))
     monkeypatch.setenv("ARETE_DB", str(data / "test.db"))
-    import store as store_module
+    from arete import store as store_module
     store_module = importlib.reload(store_module)
     store_module.init_db()
     # Most tests want the app itself, not the first-run wizard.
@@ -28,7 +28,7 @@ def store(tmp_path, monkeypatch):
 @pytest.fixture(autouse=True)
 def no_real_outlook(tmp_path, monkeypatch):
     """Tests never use the real Keychain, calendar link or cache (and never hit the network)."""
-    import outlook
+    from arete import outlook
     monkeypatch.setattr(outlook, "CACHE", tmp_path / "outlook-cache.ics")
     monkeypatch.setattr(outlook, "keyring", MemoryKeyring())
 

@@ -35,7 +35,7 @@ os.environ["ARETE_DATA_DIR"] = str(FOLDER)          # before importing store
 os.environ.pop("ARETE_DB", None)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import store  # noqa: E402  (needs ARETE_DATA_DIR set first)
+from arete import store  # noqa: E402  (needs ARETE_DATA_DIR set first)
 
 random.seed(7)
 TODAY = date.today()

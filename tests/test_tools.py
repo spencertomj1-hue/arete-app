@@ -8,7 +8,7 @@ import pytest
 
 @pytest.fixture
 def tools(store):
-    import tools as tools_module
+    from arete import tools as tools_module
     return importlib.reload(tools_module)   # picks up the reloaded store
 
 

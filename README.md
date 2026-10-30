@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Images/Logo.jpg" alt="Arete logo" width="160">
+  <img src="assets/Logo.jpg" alt="Arete logo" width="160">
 </p>
 
 <h1 align="center">Arete</h1>
@@ -91,29 +91,29 @@ Claude only changes Arete's data, through a fixed set of actions. **Anything tha
 
 **Home**
 
-![Home](Images/home.png)
+![Home](assets/home.png)
 
 **Weekly timetable**
 
-![Weekly timetable](Images/timetable.png)
+![Weekly timetable](assets/timetable.png)
 
 **Asking Claude**
 
-![Chat](Images/chat.png)
+![Chat](assets/chat.png)
 
 **Daily log**
 
-![Daily log](Images/daily-log.png)
+![Daily log](assets/daily-log.png)
 
 **First-run setup**
 
-![Setup wizard](Images/setup.png)
+![Setup wizard](assets/setup.png)
 
 **Settings**
 
-![Settings](Images/settings.png)
+![Settings](assets/settings.png)
 
-<!-- Placeholders for future screenshots: Images/stats.png, Images/habits.png -->
+<!-- Placeholders for future screenshots: assets/stats.png, assets/habits.png -->
 
 ## Requirements
 

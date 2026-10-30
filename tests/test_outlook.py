@@ -12,7 +12,7 @@ TODAY = date(2026, 10, 29)                      # window: 15 Oct -> 24 Dec 2026
 
 @pytest.fixture
 def outlook(store, tmp_path, monkeypatch):
-    import outlook as module
+    from arete import outlook as module
     module = importlib.reload(module)             # picks up the reloaded store
     monkeypatch.setattr(module, "CACHE", tmp_path / "cache.ics")
     from conftest import MemoryKeyring
@@ -136,7 +136,7 @@ def test_ago(outlook):
 
 
 def test_outlook_events_can_be_removed_and_adjusted(outlook, store):
-    import tools
+    from arete import tools
     tools = importlib.reload(tools)
     outlook.sync(TODAY, fetcher=lambda url: FIXTURE)
     listed = tools.query_blocks("2026-10-29", "2026-10-29").text
@@ -189,7 +189,7 @@ def test_short_description_drops_meeting_boilerplate(outlook):
 
 
 def test_outlook_category_setting(outlook, store):
-    import tools
+    from arete import tools
     tools = importlib.reload(tools)
     assert tools.set_outlook_category("Study").changed
     assert store.outlook_category("anything") == "study"

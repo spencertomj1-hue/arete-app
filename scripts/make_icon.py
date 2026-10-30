@@ -1,13 +1,13 @@
 """
-Build the app icon from Images/Logo.jpg.
+Build the app icon from assets/Logo.jpg.
 
 Crops the logo to its drawing, centres it on a white rounded square (the
 standard macOS icon shape, with a soft shadow), and writes:
-  Images/icon.png   1024x1024 (also used as the Dock icon by desktop.py)
-  Images/Arete.icns all sizes, for Arete.app/Contents/Resources
-  Images/splash.png the cleaned drawing, for the loading screen
+  assets/icon.png   1024x1024 (also used as the Dock icon by desktop.py)
+  assets/Arete.icns all sizes, for Arete.app/Contents/Resources
+  assets/splash.png the cleaned drawing, for the loading screen
 
-Run with:   .venv/bin/python make_icon.py
+Run with:   .venv/bin/python scripts/make_icon.py
 """
 
 import subprocess
@@ -16,11 +16,11 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-HERE = Path(__file__).parent
-LOGO = HERE / "Images" / "Logo.jpg"
-PNG = HERE / "Images" / "icon.png"
-ICNS = HERE / "Images" / "Arete.icns"
-SPLASH = HERE / "Images" / "splash.png"
+ASSETS = Path(__file__).resolve().parents[1] / "assets"
+LOGO = ASSETS / "Logo.jpg"
+PNG = ASSETS / "icon.png"
+ICNS = ASSETS / "Arete.icns"
+SPLASH = ASSETS / "splash.png"
 
 SIZE = 1024
 INSET = 100          # Apple's icon grid: the shape is 824 px inside a 1024 canvas
@@ -39,7 +39,7 @@ def clean_logo():
 
 
 def build_splash():
-    """The cleaned drawing on white, for the loading screen (splash.html)."""
+    """The cleaned drawing on white, for the loading screen (assets/splash.html)."""
     logo = clean_logo()
     logo.thumbnail((900, 900), Image.LANCZOS)
     logo.save(SPLASH)

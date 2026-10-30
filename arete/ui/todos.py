@@ -12,7 +12,7 @@ from pathlib import Path
 
 import streamlit as st
 
-import store
+from arete import store
 
 HERE = Path(__file__).parent
 
@@ -21,8 +21,8 @@ HOME_LIMIT = 6        # to-dos shown per card before "N more"
 _todos_component = st.components.v2.component(
     "arete_todos",
     html='<div class="gl-root"></div>',
-    css=(HERE / "todos_component.css").read_text(),
-    js=(HERE / "todos_component.js").read_text(),
+    css=(HERE / "components" / "todos_component.css").read_text(),
+    js=(HERE / "components" / "todos_component.js").read_text(),
 )
 
 

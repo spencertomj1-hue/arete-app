@@ -161,7 +161,7 @@ def test_export_import_round_trip(store):
 def test_backups_include_goals(store):
     import sqlite3
 
-    import setup_checks
+    from arete import setup_checks
     store.add_todo("Go gym", "weekly", "2026-10-30")
     path = setup_checks.backup_now()
     with sqlite3.connect(path) as conn:

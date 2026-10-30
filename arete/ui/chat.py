@@ -16,17 +16,17 @@ from pathlib import Path
 
 import streamlit as st
 
-import assistant
-import tools
-import voice
+from arete import assistant
+from arete import tools
+from arete import voice
 
 HERE = Path(__file__).parent
 
 _chat_component = st.components.v2.component(
     "arete_chat",
     html='<div class="cb-root"></div>',
-    css=(HERE / "chat_component.css").read_text(),
-    js=(HERE / "chat_component.js").read_text(),
+    css=(HERE / "components" / "chat_component.css").read_text(),
+    js=(HERE / "components" / "chat_component.js").read_text(),
 )
 
 MAX_SHOWN = 60   # messages sent to the panel

@@ -15,9 +15,9 @@ from pathlib import Path
 
 import numpy as np
 
-import assistant
-import store
-import voice
+from arete import assistant
+from arete import store
+from arete import voice
 
 # Shown (with copy buttons) when Claude Code isn't installed or logged in.
 INSTALL_CMD = "curl -fsSL https://claude.ai/install.sh | bash"

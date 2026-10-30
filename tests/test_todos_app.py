@@ -63,7 +63,7 @@ def test_settings_has_todo_and_goal_exports(store):
 
 
 def test_todo_component_ops(store):
-    import todos
+    from arete.ui import todos
     week = "2026-10-26"
     add = lambda tid, title: todos.apply_op(
         {"kind": "add", "goal": {"id": tid, "title": title, "period": "weekly", "period_start": week}})

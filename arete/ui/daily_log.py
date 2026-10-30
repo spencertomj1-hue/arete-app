@@ -12,15 +12,15 @@ from pathlib import Path
 
 import streamlit as st
 
-import store
+from arete import store
 
 HERE = Path(__file__).parent
 
 _calendar_component = st.components.v2.component(
     "log_calendar",
     html='<div class="cal-root"></div>',
-    css=(HERE / "calendar_component.css").read_text(),
-    js=(HERE / "calendar_component.js").read_text(),
+    css=(HERE / "components" / "calendar_component.css").read_text(),
+    js=(HERE / "components" / "calendar_component.js").read_text(),
 )
 
 

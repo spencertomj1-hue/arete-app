@@ -17,8 +17,8 @@ from pathlib import Path
 import webview
 
 APP_DIR = Path(__file__).parent
-ICON = APP_DIR / "Images" / "icon.png"   # built by make_icon.py
-SPLASH_LOGO = APP_DIR / "Images" / "splash.png"   # also built by make_icon.py
+ICON = APP_DIR / "assets" / "icon.png"   # built by scripts/make_icon.py
+SPLASH_LOGO = APP_DIR / "assets" / "splash.png"   # also built by scripts/make_icon.py
 SPLASH_SECONDS = 2.0                     # minimum time the loading screen shows
 READY_TIMEOUT = 45                       # give up waiting for the page after this (it shows anyway)
 
@@ -26,7 +26,7 @@ READY_TIMEOUT = 45                       # give up waiting for the page after th
 def splash_html():
     """splash.html with the logo embedded, so it shows before the server is up."""
     logo = base64.b64encode(SPLASH_LOGO.read_bytes()).decode()
-    return (APP_DIR / "splash.html").read_text().replace("{{LOGO}}", f"data:image/png;base64,{logo}")
+    return (APP_DIR / "assets" / "splash.html").read_text().replace("{{LOGO}}", f"data:image/png;base64,{logo}")
 
 
 def set_dock_icon():

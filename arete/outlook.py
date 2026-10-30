@@ -26,9 +26,8 @@ import recurring_ical_events
 import requests
 from icalendar.timezone.windows_to_olson import WINDOWS_TO_OLSON
 
-import store
+from arete import store
 
-HERE = Path(__file__).parent
 CACHE = store.DATA_DIR / ".outlook_cache.ics"   # last good download (gitignored)
 KEYCHAIN_SERVICE = "Arete"                 # the link is stored in the macOS Keychain
 KEYCHAIN_ACCOUNT = "outlook-ics-url"

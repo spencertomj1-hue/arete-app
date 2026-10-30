@@ -29,31 +29,40 @@ ARETE_DATA_DIR=<folder> .venv/bin/streamlit run app.py   # run against any data 
 ## 3. Files
 
 ```
-app.py                       Streamlit entry: global CSS, wizard gate, sidebar nav, Home/Stats pages, chat bar, Outlook autosync
-store.py                     ALL SQL; timetable painting rules; settings.json; stats. No Streamlit.
-timetable.py                 Timetable page and the week/day grid component's Python side
-timetable_component.js/.css  The grid (Streamlit components v2, shadow root)
-daily_log.py                 Daily Log page (month calendar, day card, the day's habits, entry form) and Home's habits
-todos.py                     Home's to-do cards: the to-do list component's Python side
-todos_component.js/.css      The Reminders-style to-do lists (3 compact cards: day, week, month)
-goals.py                     Goals page and Home's goal bars (native Streamlit widgets + an HTML bar)
-sidebar_theme.py             The sidebar's look: marble background (Images/sidebar.webp, embedded as a data URI), no title, narrow, a box per menu item
-network.py                   Network page: the web component's Python side, plus edit / add / group forms
-network_component.js/.css    The people web (SVG + a small force layout, no libraries)
-calendar_component.js/.css   The month calendar component
-tools.py                     What Claude can do: plain functions over store.py, previews for destructive changes
-assistant.py                 Claude via claude-agent-sdk: finds the CLI, system prompt, in-process "arete" MCP server
-chat.py, chat_component.*    The chat bar / Home ask box, and its flow (send → transcribe → Claude → rerun)
-voice.py                     Microphone recording (sounddevice) and local transcription (faster-whisper)
-outlook.py                   Read-only Outlook import: link checks, Keychain, fetch, recurrence expansion, sync
-settings_ui.py               First-run wizard and the Settings page
-setup_checks.py              Logic behind them: Claude status, mic test, backups, Finder
-desktop.py, splash.html      Native window launcher with a splash screen (pywebview)
-make_icon.py                 Builds Images/icon.png, Images/Arete.icns and Images/splash.png from Images/Logo.jpg
-scripts/seed_demo.py         Demo data folder (never touches real data)
-scripts/install-hooks.sh     gitleaks pre-commit hook
-setup.sh                     One-command install
-tests/                       pytest + AppTest; tests/fixtures/sample.ics is a fake calendar
+app.py                         Streamlit entry: global CSS, wizard gate, sidebar nav, Home/Stats pages, chat bar, Outlook autosync
+desktop.py                     Native window launcher with a splash screen (pywebview); what Arete.app runs
+setup.sh                       One-command install (venv, packages, Arete.app)
+
+arete/                         The app's code, as a package (imported as `from arete import store`, ...)
+  store.py                     ALL SQL; timetable painting rules; settings.json; stats. No Streamlit.
+  tools.py                     What Claude can do: plain functions over store.py, previews for destructive changes
+  assistant.py                 Claude via claude-agent-sdk: finds the CLI, system prompt, in-process "arete" MCP server
+  voice.py                     Microphone recording (sounddevice) and local transcription (faster-whisper)
+  outlook.py                   Read-only Outlook import: link checks, Keychain, fetch, recurrence expansion, sync
+  setup_checks.py              Logic behind the wizard/Settings: Claude status, mic test, backups, Finder
+  ui/                          One module per page or section (imported as `from arete.ui import goals`, ...)
+    timetable.py               Timetable page and the week/day grid's Python side
+    daily_log.py               Daily Log page (month calendar, day card, the day's habits, entry form) and Home's habits
+    todos.py                   Home's to-do cards
+    goals.py                   Goals page and Home's goal bars (native Streamlit widgets + an HTML bar)
+    network.py                 Network page: the web's Python side, plus the add / edit dialogs
+    chat.py                    The chat bar / Home ask box, and its flow (send → transcribe → Claude → rerun)
+    settings_ui.py             First-run wizard and the Settings page
+    sidebar_theme.py           The sidebar's look: marble background, no title, narrow, a box per menu item
+    components/                Front ends (Streamlit components v2, shadow root), read once at import:
+      timetable_component.*    the week/day grid
+      todos_component.*        the Reminders-style to-do lists
+      network_component.*      the people web (SVG + a small force layout, no libraries)
+      calendar_component.*     the month calendar
+      chat_component.*         the chat bar
+
+assets/                        Logo, app icon (icon.png, Arete.icns), splash screen (splash.html/.png),
+                               sidebar background (sidebar.webp) and the README screenshots
+scripts/
+  seed_demo.py                 Demo data folder (never touches real data)
+  make_icon.py                 Builds assets/icon.png, Arete.icns and splash.png from assets/Logo.jpg
+  install-hooks.sh             gitleaks pre-commit hook
+tests/                         pytest + AppTest; tests/fixtures/sample.ics is a fake calendar
 ```
 
 ## 4. Data model (`store.py`)

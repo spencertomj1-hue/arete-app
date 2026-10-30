@@ -11,9 +11,9 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-import outlook
-import setup_checks
-import store
+from arete import outlook
+from arete import setup_checks
+from arete import store
 
 STEPS = [("Welcome", ":material/waving_hand:"), ("Claude", ":material/chat:"),
          ("Calendar", ":material/calendar_month:"), ("Microphone", ":material/mic:"), ("Done", ":material/check_circle:")]

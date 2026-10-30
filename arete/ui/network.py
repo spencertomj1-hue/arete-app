@@ -12,7 +12,7 @@ from pathlib import Path
 
 import streamlit as st
 
-import store
+from arete import store
 
 HERE = Path(__file__).parent
 PAGE = "Network"
@@ -20,8 +20,8 @@ PAGE = "Network"
 _network_component = st.components.v2.component(
     "arete_network",
     html='<div class="nw-root"></div>',
-    css=(HERE / "network_component.css").read_text(),
-    js=(HERE / "network_component.js").read_text(),
+    css=(HERE / "components" / "network_component.css").read_text(),
+    js=(HERE / "components" / "network_component.js").read_text(),
 )
 
 

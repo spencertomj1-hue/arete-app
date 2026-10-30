@@ -13,8 +13,8 @@ from pathlib import Path
 
 import streamlit as st
 
-import outlook
-import store
+from arete import outlook
+from arete import store
 
 HERE = Path(__file__).parent
 SYNC_EVERY = timedelta(minutes=15)
@@ -23,8 +23,8 @@ SYNC_EVERY = timedelta(minutes=15)
 _timetable_component = st.components.v2.component(
     "daily_timetable",
     html='<div class="tt-root"></div>',
-    css=(HERE / "timetable_component.css").read_text(),
-    js=(HERE / "timetable_component.js").read_text(),
+    css=(HERE / "components" / "timetable_component.css").read_text(),
+    js=(HERE / "components" / "timetable_component.js").read_text(),
 )
 
 

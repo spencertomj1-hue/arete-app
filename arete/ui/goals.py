@@ -11,7 +11,7 @@ from html import escape
 
 import streamlit as st
 
-import store
+from arete import store
 
 PAGE = "Goals"                                  # sidebar label (also what "See all" switches to)
 NAMES = {"monthly": "Monthly", "yearly": "Yearly"}

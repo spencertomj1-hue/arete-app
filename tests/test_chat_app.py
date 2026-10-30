@@ -13,8 +13,8 @@ APP = str(Path(__file__).resolve().parents[1] / "app.py")
 
 @pytest.fixture
 def fake_claude(store, monkeypatch):
-    import assistant
-    import tools
+    from arete import assistant
+    from arete import tools
 
     calls = []
 
@@ -69,7 +69,7 @@ def test_preview_waits_for_confirm(store, fake_claude):
 
 
 def test_claude_error_is_shown_not_raised(store, monkeypatch):
-    import assistant
+    from arete import assistant
     monkeypatch.setattr(assistant, "run_turn", lambda text, history=(): assistant.Turn(error=assistant.LOGIN_HELP))
     at = AppTest.from_file(APP, default_timeout=60).run()
     at.session_state["chat_queue"] = "hi"
@@ -81,7 +81,7 @@ def test_claude_error_is_shown_not_raised(store, monkeypatch):
 
 def test_voice_transcript_becomes_message(store, fake_claude, monkeypatch):
     import numpy as np
-    import voice
+    from arete import voice
     monkeypatch.setattr(voice, "transcribe", lambda audio: "slept 7 to 9")
     at = AppTest.from_file(APP, default_timeout=60).run()
     # What the mic "stop" callback leaves behind:
@@ -95,7 +95,7 @@ def test_voice_transcript_becomes_message(store, fake_claude, monkeypatch):
 
 def test_voice_error_is_shown(store, monkeypatch):
     import numpy as np
-    import voice
+    from arete import voice
 
     def fail(audio):
         raise voice.VoiceError("Couldn't make out any words.")

@@ -9,7 +9,7 @@ import wave
 import numpy as np
 import pytest
 
-import voice
+from arete import voice
 
 
 class FakeStream:

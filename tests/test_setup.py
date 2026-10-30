@@ -16,7 +16,7 @@ GOOD = "https://outlook.office365.com/published/0000fake/1111fake/calendar.ics"
 
 @pytest.fixture
 def outlook(store, tmp_path, monkeypatch):
-    import outlook as module
+    from arete import outlook as module
     module = importlib.reload(module)
     monkeypatch.setattr(module, "CACHE", tmp_path / "cache.ics")
     monkeypatch.setattr(module, "keyring", MemoryKeyring())
@@ -70,8 +70,8 @@ def test_try_link_and_connect(outlook, store):
 # --- Claude, settings, backups ---
 
 def test_claude_status(store, tmp_path, monkeypatch):
-    import assistant
-    import setup_checks
+    from arete import assistant
+    from arete import setup_checks
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr(assistant, "find_claude", lambda: None)
     assert setup_checks.claude_status()["found"] is False
@@ -88,7 +88,7 @@ def test_claude_status(store, tmp_path, monkeypatch):
 
 
 def test_settings_and_backups(store):
-    import setup_checks
+    from arete import setup_checks
     setup_checks.save_settings(wizard_done=False, other=1)
     assert setup_checks.load_settings() == {"wizard_done": False, "other": 1}
     path = setup_checks.backup_now()
@@ -99,7 +99,7 @@ def test_settings_and_backups(store):
 # --- the wizard ---
 
 def test_wizard_shows_on_a_fresh_data_folder_and_finishes(store, monkeypatch):
-    import setup_checks
+    from arete import setup_checks
     os.remove(store.DATA_DIR / "settings.json")                 # a brand-new data folder
     monkeypatch.setattr(setup_checks, "claude_status", lambda: {
         "found": False, "path": None, "logged_in": False, "account": None, "note": "Not installed."})

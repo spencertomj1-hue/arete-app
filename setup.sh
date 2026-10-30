@@ -49,7 +49,7 @@ else
   mkdir -p "$HOME/Applications"; APP="$HOME/Applications/Arete.app"
 fi
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp Images/Arete.icns "$APP/Contents/Resources/Arete.icns"
+cp assets/Arete.icns "$APP/Contents/Resources/Arete.icns"
 
 cat > "$APP/Contents/MacOS/Arete" <<EOF
 #!/bin/zsh

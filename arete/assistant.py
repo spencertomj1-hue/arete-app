@@ -26,10 +26,9 @@ from claude_agent_sdk import (
     ClaudeAgentOptions, CLINotFoundError, ResultMessage, create_sdk_mcp_server, query, tool,
 )
 
-import store
-import tools
+from arete import store
+from arete import tools
 
-HERE = Path(__file__).parent
 CONFIG_PATH = store.DATA_DIR / "arete_config.json"   # optional: {"claude_path": "...", "model": "..."}
 TZ = ZoneInfo("Europe/London")
 
