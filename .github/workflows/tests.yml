@@ -7,6 +7,8 @@ on:
 
 jobs:
   test:
+    # Only on the public repo: private copies would spend their limited Actions minutes.
+    if: ${{ !github.event.repository.private }}
     strategy:
       fail-fast: false
       matrix:

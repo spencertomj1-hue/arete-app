@@ -33,6 +33,7 @@ env:
 
 jobs:
   windows:
+    if: ${{ !github.event.repository.private }}   # public repo only (private Actions minutes are limited)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -95,6 +96,7 @@ jobs:
           path: dist/Arete-Setup.exe
 
   mac:
+    if: ${{ !github.event.repository.private }}   # public repo only (private Actions minutes are limited)
     runs-on: macos-latest          # Apple silicon
     steps:
       - uses: actions/checkout@v4
