@@ -1,0 +1,105 @@
+# Builds the Windows installer (Arete-Setup.exe) on a Windows machine:
+#   1. PyInstaller bundles the app with Python and every package (packaging/arete.spec)
+#   2. smoke tests: the bundle imports everything, and its server starts and answers
+#   3. Inno Setup wraps it into Arete-Setup.exe (packaging/arete.iss)
+#   4. the installer is kept as a download on the run's page, and, for a release,
+#      attached to a GitHub Release
+#
+# Make a release: Actions -> "Windows installer" -> Run workflow, with a version
+# and "publish" ticked. (Pushing a tag like v1.1.0 does the same.)
+name: Windows installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, e.g. 1.1.0"
+        required: true
+      publish:
+        description: "Publish a GitHub Release with the installer"
+        type: boolean
+        default: false
+  push:
+    tags: ["v*"]
+    branches: ["windows-installer"]     # test builds while the installer is being worked on
+  pull_request:
+    paths: ["packaging/**", "desktop.py", "requirements.txt", ".github/workflows/release.yml"]
+
+permissions:
+  contents: write          # to create the release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Work out the version
+        shell: pwsh
+        run: |
+          $v = "${{ inputs.version }}"
+          if (-not $v -and "${{ github.ref_type }}" -eq "tag") { $v = "${{ github.ref_name }}".TrimStart("v") }
+          if (-not $v) { $v = "0.0.0" }
+          "ARETE_VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Version $v"
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt "pyinstaller>=6.11,<7"
+
+      - name: Bundle with PyInstaller
+        run: pyinstaller packaging/arete.spec --noconfirm --distpath dist --workpath build
+
+      - name: "Smoke test: everything imports"
+        shell: pwsh
+        run: |
+          $env:ARETE_DATA_DIR = Join-Path $env:RUNNER_TEMP "arete-check"
+          $p = Start-Process dist\Arete\Arete.exe -ArgumentList "--check" -Wait -PassThru
+          Get-Content (Join-Path $env:ARETE_DATA_DIR "logs\arete.log") -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "Arete.exe --check failed ($($p.ExitCode))" }
+
+      - name: "Smoke test: the server starts"
+        shell: pwsh
+        run: |
+          $env:ARETE_DATA_DIR = Join-Path $env:RUNNER_TEMP "arete-serve"
+          $p = Start-Process dist\Arete\Arete.exe -ArgumentList "--serve", "8765" -PassThru
+          $ok = $false
+          foreach ($i in 1..60) {
+            try {
+              $r = Invoke-WebRequest "http://127.0.0.1:8765/_stcore/health" -UseBasicParsing -TimeoutSec 2
+              if ($r.Content -eq "ok") { $ok = $true; break }
+            } catch {}
+            Start-Sleep -Seconds 2
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          Get-Content (Join-Path $env:ARETE_DATA_DIR "logs\arete.log") -ErrorAction SilentlyContinue | Select-Object -Last 40
+          if (-not $ok) { throw "The bundled server didn't start" }
+
+      - name: Build the installer (Inno Setup)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) { choco install innosetup --no-progress -y }
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\arete.iss
+          Get-Item dist\Arete-Setup.exe | Select-Object Name, Length
+
+      - name: Keep the installer as a download on this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arete-Setup-${{ env.ARETE_VERSION }}
+          path: dist/Arete-Setup.exe
+
+      - name: Publish the GitHub Release
+        if: inputs.publish || github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v$env:ARETE_VERSION"
+          $notes = "Windows installer: download **Arete-Setup.exe** below and run it. Windows may show " +
+                   "'Windows protected your PC' because the installer isn't code-signed: click **More info** then **Run anyway**."
+          gh release create $tag dist/Arete-Setup.exe --target $env:GITHUB_SHA --title "Arete $tag" --notes $notes

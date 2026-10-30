@@ -4,10 +4,17 @@ Desktop launcher: runs the Streamlit app in its own native window (no browser).
 Run with:   .venv/bin/python desktop.py          (macOS / Linux)
             .venv/Scripts/pythonw.exe desktop.py  (Windows)
 Or open "Arete.app" (macOS) or the Arete shortcut (Windows), made by setup.sh / setup.ps1.
+
+It's also the entry point of the packaged Windows app (Arete.exe, built by
+packaging/arete.spec). A packaged app has no separate Python to run Streamlit
+with, so it starts a second copy of itself with `--serve PORT` to be the server.
+`Arete.exe --check` imports everything and sets up a database, then exits with
+0 if all is well (the release build uses it as a smoke test).
 """
 
 import atexit
 import base64
+import os
 import signal
 import socket
 import subprocess
@@ -17,7 +24,8 @@ from pathlib import Path
 
 import webview
 
-APP_DIR = Path(__file__).parent
+FROZEN = getattr(sys, "frozen", False)          # running as the packaged Arete.exe
+APP_DIR = Path(sys._MEIPASS) if FROZEN else Path(__file__).parent
 ICON = APP_DIR / "assets" / "icon.png"   # built by scripts/make_icon.py
 SPLASH_LOGO = APP_DIR / "assets" / "splash.png"   # also built by scripts/make_icon.py
 SPLASH_SECONDS = 2.0                     # minimum time the loading screen shows
@@ -45,6 +53,48 @@ def set_dock_icon():
         pass  # cosmetic only
 
 
+def quiet_output():
+    """A windowed Arete.exe has no console, so send output to a log file in the data folder."""
+    if sys.stdout is None or sys.stderr is None:
+        from arete.system import default_data_dir
+        logs = Path(os.environ.get("ARETE_DATA_DIR") or default_data_dir()) / "logs"
+        logs.mkdir(parents=True, exist_ok=True)
+        log = open(logs / "arete.log", "a", encoding="utf-8", buffering=1)   # noqa: SIM115 - lives as long as the app
+        sys.stdout = sys.stdout or log
+        sys.stderr = sys.stderr or log
+
+
+def serve(port):
+    """Run the Streamlit server in this process (the packaged app's server copy)."""
+    quiet_output()
+    os.chdir(APP_DIR)                     # Streamlit reads .streamlit/config.toml from here
+    from streamlit.web import cli as streamlit_cli
+    sys.argv = ["streamlit", "run", str(APP_DIR / "app.py"), *server_flags(port),
+                "--global.developmentMode", "false"]
+    sys.exit(streamlit_cli.main())
+
+
+def check():
+    """Import every module and set up a throwaway database: exits 0 if the build is complete."""
+    quiet_output()
+    import importlib
+    import pkgutil
+    import tempfile
+    os.environ.setdefault("ARETE_DATA_DIR", tempfile.mkdtemp(prefix="arete-check-"))
+    import arete
+    for module in pkgutil.walk_packages(arete.__path__, "arete."):
+        importlib.import_module(module.name)
+    from arete import store
+    store.init_db()
+    import streamlit.web.cli  # noqa: F401
+    print("Arete check OK")
+
+
+def server_flags(port):
+    return ["--server.headless", "true", "--server.port", str(port),
+            "--server.address", "127.0.0.1", "--browser.gatherUsageStats", "false"]
+
+
 def free_port():
     """Ask the OS for an unused port so we never clash with another app."""
     with socket.socket() as s:
@@ -67,17 +117,14 @@ def wait_for_server(port, timeout=30):
 def main():
     port = free_port()
 
-    # Start Streamlit in the background without opening a browser tab.
-    server = subprocess.Popen(
-        [
-            sys.executable, "-m", "streamlit", "run", str(APP_DIR / "app.py"),
-            "--server.headless", "true",
-            "--server.port", str(port),
-            "--server.address", "127.0.0.1",
-            "--browser.gatherUsageStats", "false",
-        ],
-        cwd=APP_DIR,
-    )
+    # Start Streamlit in the background without opening a browser tab (or, on
+    # Windows, a console window).
+    if FROZEN:
+        command = [sys.executable, "--serve", str(port)]
+    else:
+        command = [sys.executable, "-m", "streamlit", "run", str(APP_DIR / "app.py"), *server_flags(port)]
+    server = subprocess.Popen(command, cwd=APP_DIR,
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
     def stop_server():
         if server.poll() is None:
@@ -154,4 +201,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 2 and sys.argv[1] == "--serve":
+        serve(int(sys.argv[2]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "--check":
+        check()
+    else:
+        quiet_output()
+        main()
