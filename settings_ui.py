@@ -281,22 +281,33 @@ def _data_section():
             store.save_all_data(new, replace=mode.startswith("Replace"))
             st.success(f"Imported {len(new)} rows.")
 
-    st.subheader("Goals")
-    st.write("Goals export and import as their own CSV, one row per goal.")
-    st.download_button("Download goals CSV", store.load_goals().to_csv(index=False),
-                       file_name=f"arete_goals_{date.today()}.csv", mime="text/csv", icon=":material/download:")
-    st.write(
-        "To import, use the same columns: `title`, `period` (daily, weekly, monthly or yearly) and "
-        "`period_start` (YYYY-MM-DD, any day in the period) are needed; `id`, `notes`, `done`, `done_at`, "
-        "`repeat`, `ord` and `created_at` are optional. A row whose `id` already exists updates that goal."
+    _csv_section(
+        "To-dos", "todos", store.load_todos, store.save_todos, ["title", "period"],
+        "`title`, `period` (daily, weekly or monthly) and `period_start` (YYYY-MM-DD, any day in the period); "
+        "optional `id`, `notes`, `done`, `done_at`, `repeat`, `ord` and `created_at`.",
     )
-    goals_file = st.file_uploader("Goals CSV file", type="csv", key="goals_csv")
-    goals_mode = st.radio("Goals import mode", ["Merge (update matching ids)", "Replace all existing goals"],
-                          key="goals_mode")
-    if goals_file and st.button("Import goals", icon=":material/upload:"):
-        new = pd.read_csv(goals_file)
-        if not {"title", "period"} <= set(new.columns):
-            st.error("The CSV needs `title` and `period` columns.")
+    _csv_section(
+        "Goals", "goals", store.load_goals, store.save_goals, ["title", "period", "target"],
+        "`title`, `period` (monthly or yearly), `target` and `period_start` (YYYY-MM-DD, any day in the "
+        "month or year); optional `id`, `unit`, `progress`, `habit` (a habit's name, to count its ticks), "
+        "`ord` and `created_at`.",
+    )
+
+
+def _csv_section(name, slug, load, save, required, columns):
+    """Export / import for to-dos or goals: their own CSV, one row per item."""
+    st.subheader(name)
+    st.write(f"{name} export and import as their own CSV, one row per item.")
+    st.download_button(f"Download {name.lower()} CSV", load().to_csv(index=False),
+                       file_name=f"arete_{slug}_{date.today()}.csv", mime="text/csv", icon=":material/download:")
+    st.write(f"To import, use the same columns: {columns} A row whose `id` already exists updates it.")
+    uploaded = st.file_uploader(f"{name} CSV file", type="csv", key=f"{slug}_csv")
+    mode = st.radio(f"{name} import mode", ["Merge (update matching ids)", f"Replace all existing {name.lower()}"],
+                    key=f"{slug}_mode")
+    if uploaded and st.button(f"Import {name.lower()}", icon=":material/upload:"):
+        new = pd.read_csv(uploaded)
+        if not set(required) <= set(new.columns):
+            st.error("The CSV needs " + ", ".join(f"`{c}`" for c in required) + " columns.")
         else:
-            count = store.save_goals(new, replace=goals_mode.startswith("Replace"))
-            st.success(f"Imported {count} goals.")
+            count = save(new, replace=mode.startswith("Replace"))
+            st.success(f"Imported {count} {name.lower()}.")

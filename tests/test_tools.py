@@ -198,7 +198,7 @@ def test_edit_category_and_activity_default(tools, store):
     assert store.blocks_between("2026-10-29", "2026-10-29")[0]["category_id"] == "piano"
 
 
-# --- goals ---
+# --- to-dos ---
 
 @pytest.fixture
 def friday(store, monkeypatch):
@@ -206,75 +206,115 @@ def friday(store, monkeypatch):
     monkeypatch.setattr(store, "london_today", lambda: date(2026, 10, 30))
 
 
-def test_add_goal_to_this_week(tools, store, friday):
-    r = tools.add_goal("Go gym", "weekly")
-    assert r.changed and r.text == "Added 'Go gym' to this week's goals (26 Oct to 1 Nov)."
-    assert [g["title"] for g in store.goals_for("weekly", "2026-10-26")] == ["Go gym"]
-    again = tools.add_goal("go gym", "week")
+def test_add_todo_to_this_week(tools, store, friday):
+    r = tools.add_todo("Go gym", "weekly")
+    assert r.changed and r.text == "Added 'Go gym' to this week's to-dos (26 Oct to 1 Nov)."
+    assert [g["title"] for g in store.todos_for("weekly", "2026-10-26")] == ["Go gym"]
+    again = tools.add_todo("go gym", "week")
     assert not again.changed and "already" in again.text
-    r = tools.add_goal("Budget", "monthly", date="2026-11-12", repeat=True, notes="bills")
-    assert "the November 2026 goals" in r.text and "repeating every month" in r.text
-    assert store.goals_for("monthly", "2026-11-01")[0]["repeat"] is True
+    r = tools.add_todo("Budget", "monthly", date="2026-11-12", repeat=True, notes="bills")
+    assert "the November 2026 to-dos" in r.text and "repeating every month" in r.text
+    assert store.todos_for("monthly", "2026-11-01")[0]["repeat"] is True
     with pytest.raises(tools.ToolError):
-        tools.add_goal("x", "fortnightly")
+        tools.add_todo("x", "fortnightly")
 
 
 def test_complete_and_uncomplete_by_title(tools, store, friday):
-    store.add_goal("Finish problem sheet", "daily", "2026-10-30")
-    store.add_goal("Read", "weekly", "2026-10-30")
-    r = tools.complete_goal("finish problem sheet")
-    assert r.changed and r.text == "Ticked off 'Finish problem sheet' in today's goals (1/1 done)."
-    assert store.goals_for("daily", "2026-10-30")[0]["done"]
-    assert "already" in tools.complete_goal("problem sheet").text      # partial titles work too
-    assert tools.uncomplete_goal("Finish problem sheet").changed
-    assert not store.goals_for("daily", "2026-10-30")[0]["done"]
+    store.add_todo("Finish problem sheet", "daily", "2026-10-30")
+    store.add_todo("Read", "weekly", "2026-10-30")
+    r = tools.complete_todo("finish problem sheet")
+    assert r.changed and r.text == "Ticked off 'Finish problem sheet' in today's to-dos (1/1 done)."
+    assert store.todos_for("daily", "2026-10-30")[0]["done"]
+    assert "already" in tools.complete_todo("problem sheet").text      # partial titles work too
+    assert tools.uncomplete_todo("Finish problem sheet").changed
+    assert not store.todos_for("daily", "2026-10-30")[0]["done"]
 
 
-def test_find_goal_ambiguous_missing_and_by_period(tools, store, friday):
-    store.add_goal("Read", "daily", "2026-10-30")
-    store.add_goal("Read", "weekly", "2026-10-30")
-    store.add_goal("Old", "daily", "2026-10-01")
+def test_find_todo_ambiguous_missing_and_by_period(tools, store, friday):
+    store.add_todo("Read", "daily", "2026-10-30")
+    store.add_todo("Read", "weekly", "2026-10-30")
+    store.add_todo("Old", "daily", "2026-10-01")
     with pytest.raises(tools.ToolError, match="More than one"):
-        tools.complete_goal("read")
-    assert "this week's" in tools.complete_goal("read", period="weekly").text
-    with pytest.raises(tools.ToolError, match="no goal"):
-        tools.complete_goal("old")                                    # not in the current periods
-    assert tools.complete_goal("old", date="2026-10-01").changed
-    gid = store.goals_for("daily", "2026-10-30")[0]["id"]
-    assert tools.complete_goal(gid).changed                           # by id
+        tools.complete_todo("read")
+    assert "this week's" in tools.complete_todo("read", period="weekly").text
+    with pytest.raises(tools.ToolError, match="no to-do"):
+        tools.complete_todo("old")                                    # not in the current periods
+    assert tools.complete_todo("old", date="2026-10-01").changed
+    gid = store.todos_for("daily", "2026-10-30")[0]["id"]
+    assert tools.complete_todo(gid).changed                           # by id
 
 
-def test_delete_goal_needs_confirm(tools, store, friday):
-    store.add_goal("Tidy desk", "daily", "2026-10-30")
-    r = tools.delete_goal("tidy desk")
-    assert r.pending and r.pending.summary == "Delete the goal 'Tidy desk' in today's goals"
-    assert store.goals_for("daily", "2026-10-30")
+def test_delete_todo_needs_confirm(tools, store, friday):
+    store.add_todo("Tidy desk", "daily", "2026-10-30")
+    r = tools.delete_todo("tidy desk")
+    assert r.pending and r.pending.summary == "Delete the to-do 'Tidy desk' in today's to-dos"
+    assert store.todos_for("daily", "2026-10-30")
     assert r.pending.run().changed
-    assert store.goals_for("daily", "2026-10-30") == []
+    assert store.todos_for("daily", "2026-10-30") == []
 
 
-def test_list_goals(tools, store, friday):
-    g = store.add_goal("Go gym", "weekly", "2026-10-30", repeat=True, notes="3 times")
-    store.set_goal_done(g["id"], True)
-    store.add_goal("Essay", "weekly", "2026-10-30")
-    text = tools.list_goals(period="weekly").text
+def test_list_todos(tools, store, friday):
+    g = store.add_todo("Go gym", "weekly", "2026-10-30", repeat=True, notes="3 times")
+    store.set_todo_done(g["id"], True)
+    store.add_todo("Essay", "weekly", "2026-10-30")
+    text = tools.list_todos(period="weekly").text
     assert text.splitlines() == [
-        "This week's goals (26 Oct to 1 Nov): 1/2 done",
+        "This week's to-dos (26 Oct to 1 Nov): 1/2 done",
         f"- [x] Go gym (id {g['id']}; repeats; notes: 3 times)",
-        f"- [ ] Essay (id {store.goals_for('weekly', '2026-10-26')[1]['id']})",
+        f"- [ ] Essay (id {store.todos_for('weekly', '2026-10-26')[1]['id']})",
     ]
-    everything = tools.list_goals().text
-    assert "Today's goals: 0/0 done" in everything and "The 2026 goals: 0/0 done" in everything
+    everything = tools.list_todos().text
+    assert "Today's to-dos: 0/0 done" in everything and "The October 2026 to-dos: 0/0 done" in everything
 
 
-def test_goal_tools_roll_repeats_first(tools, store, friday):
-    store.add_goal("Stretch", "daily", "2026-10-29", repeat=True)
-    assert "Stretch" in tools.list_goals(period="daily").text
-    assert tools.complete_goal("stretch").changed
+def test_todo_tools_roll_repeats_first(tools, store, friday):
+    store.add_todo("Stretch", "daily", "2026-10-29", repeat=True)
+    assert "Stretch" in tools.list_todos(period="daily").text
+    assert tools.complete_todo("stretch").changed
 
 
-def test_complete_goal_by_shared_words(tools, store, friday):
-    store.add_goal("Problem sheet 4", "daily", "2026-10-30")
-    store.add_goal("Go gym", "weekly", "2026-10-30")
-    assert "Problem sheet 4" in tools.complete_goal("finish problem sheet").text
-    assert store.goals_for("daily", "2026-10-30")[0]["done"]
+def test_complete_todo_by_shared_words(tools, store, friday):
+    store.add_todo("Problem sheet 4", "daily", "2026-10-30")
+    store.add_todo("Go gym", "weekly", "2026-10-30")
+    assert "Problem sheet 4" in tools.complete_todo("finish problem sheet").text
+    assert store.todos_for("daily", "2026-10-30")[0]["done"]
+
+
+# --- goals ---
+
+def test_add_and_update_goal_by_hand(tools, store, friday):
+    r = tools.add_goal("Read books", 20, "yearly", unit="books")
+    assert r.changed and r.text == "Added the goal 'Read books' (2026: 0/20 books)."
+    assert "already" in tools.add_goal("read books", 5, "year").text
+    assert tools.log_goal_progress("read", 2).text == "Updated 'Read books' (2026: 2/20 books)."
+    assert tools.set_goal_progress("books", 5).text == "Set 'Read books' (2026: 5/20 books) (was 2)."
+    with pytest.raises(tools.ToolError):
+        tools.add_goal("Gym", 12, "weekly")                  # goals are monthly or yearly
+    with pytest.raises(tools.ToolError):
+        tools.add_goal("Gym", 0)
+
+
+def test_goal_linked_to_habit(tools, store, friday):
+    tools.add_habit("Gym")
+    r = tools.add_goal("Gym", 12, unit="sessions", habit="gym")
+    assert "counted from the habit Gym" in r.text and "October 2026: 0/12" in r.text
+    tools.set_habit("2026-10-29", "Gym", True)
+    assert "1/12 sessions (8%)" in tools.list_goals("monthly").text
+    with pytest.raises(tools.ToolError, match="Tick the habit"):
+        tools.log_goal_progress("gym")
+    with pytest.raises(tools.ToolError, match="no habit"):
+        tools.add_goal("Swim", 4, habit="swimming")
+    assert "counted from" not in tools.edit_goal("gym", unlink_habit=True).text
+    assert tools.log_goal_progress("gym", 3).changed
+
+
+def test_edit_list_and_delete_goal(tools, store, friday):
+    tools.add_goal("Run", 50, unit="km")
+    assert "80 km" in tools.edit_goal("run", target=80).text
+    listing = tools.list_goals().text
+    assert "Monthly goals (October 2026):" in listing and "Yearly goals (2026): none" in listing
+    r = tools.delete_goal("run")
+    assert r.pending and r.pending.summary == "Delete the goal 'Run' (October 2026: 0/80 km)"
+    assert store.goals_in("monthly", "2026-10-01")
+    r.pending.run()
+    assert store.goals_in("monthly", "2026-10-01") == []

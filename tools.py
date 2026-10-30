@@ -447,111 +447,247 @@ def query_blocks(start_date, end_date, track=None):
 
 
 # ---------------------------------------------------------------------------
-# Goals
+# To-dos: tick-off lists for a day, a week or a month
 # ---------------------------------------------------------------------------
 
 PERIOD_NAMES = {"daily": "day", "weekly": "week", "monthly": "month", "yearly": "year"}
 
 
-def _period(value):
+def _period(value, allowed=store.TODO_PERIODS):
     v = str(value).strip().lower()
     v = {"day": "daily", "today": "daily", "week": "weekly", "month": "monthly", "year": "yearly"}.get(v, v)
-    if v not in store.GOAL_PERIODS:
-        raise ToolError("period must be 'daily', 'weekly', 'monthly' or 'yearly'.")
+    if v not in allowed:
+        raise ToolError("period must be " + " or ".join(f"'{a}'" for a in allowed) + ".")
     return v
 
 
-def _goal_day(value):
+def _period_day(value):
     return date.fromisoformat(_day(value)) if value else store.london_today()
 
 
-def goal_list_name(period, start):
-    """"this week's goals (26 Oct to 1 Nov)", "today's goals", "the November 2026 goals"."""
+def todo_list_name(period, start):
+    """"this week's to-dos (26 Oct to 1 Nov)", "today's to-dos", "the November 2026 to-dos"."""
     title = store.period_title(period, start)
     named = {"Today": "today's", "Yesterday": "yesterday's", "Tomorrow": "tomorrow's"}.get(title)
     if named:
-        return f"{named} goals"
+        return f"{named} to-dos"
     if ": " in title:
         when, span = title.split(": ")
-        return f"{when.lower()}'s goals ({span})"
-    return f"the {title} goals"
+        return f"{when.lower()}'s to-dos ({span})"
+    return f"the {title} to-dos"
 
 
-def describe_goal(g):
-    return f"'{g['title']}' in {goal_list_name(g['period'], g['period_start'])}"
+def describe_todo(t):
+    return f"'{t['title']}' in {todo_list_name(t['period'], t['period_start'])}"
 
 
-def add_goal(title, period, date=None, repeat=False, notes=None):
-    """Add a goal to the period containing `date` (default today)."""
+def add_todo(title, period, date=None, repeat=False, notes=None):
+    """Add a to-do to the period containing `date` (default today)."""
     title, per = str(title).strip(), _period(period)
     if not title:
-        raise ToolError("The goal needs a title.")
-    day = _goal_day(date)
-    store.roll_goals()
-    start = store.goal_period_start(per, day)
-    if any(g["title"].lower() == title.lower() for g in store.goals_for(per, start)):
-        return Result(f"'{title}' is already in {goal_list_name(per, start)}.")
-    g = store.add_goal(title, per, day, notes=notes, repeat=bool(repeat))
+        raise ToolError("The to-do needs a title.")
+    day = _period_day(date)
+    store.roll_todos()
+    start = store.start_of_period(per, day)
+    if any(t["title"].lower() == title.lower() for t in store.todos_for(per, start)):
+        return Result(f"'{title}' is already in {todo_list_name(per, start)}.")
+    t = store.add_todo(title, per, day, notes=notes, repeat=bool(repeat))
     extra = f", repeating every {PERIOD_NAMES[per]}" if repeat else ""
-    return Result(f"Added '{g['title']}' to {goal_list_name(per, start)}{extra}.", changed=True)
+    return Result(f"Added '{t['title']}' to {todo_list_name(per, start)}{extra}.", changed=True)
 
 
-def _current_goals(day, period=None):
-    """Goals in the periods containing `day` (all four kinds, or just one)."""
-    periods = [period] if period else store.GOAL_PERIODS
-    return [g for p in periods for g in store.goals_for(p, store.goal_period_start(p, day))]
+def _current_todos(day, period=None):
+    """To-dos in the periods containing `day` (all kinds, or just one)."""
+    periods = [period] if period else store.TODO_PERIODS
+    return [t for p in periods for t in store.todos_for(p, store.start_of_period(p, day))]
 
 
-FILLER_WORDS = {"the", "a", "an", "my", "to", "do", "finish", "finished", "done", "complete", "tick", "off", "goal"}
+FILLER_WORDS = {"the", "a", "an", "my", "to", "do", "finish", "finished", "done", "complete", "tick", "off",
+                "goal", "todo"}
 
 
 def _words(text):
     return set(re.findall(r"[a-z0-9]+", text.lower())) - FILLER_WORDS
 
 
-def _most_shared_words(pool, text):
-    """Goals sharing the most words with `text`, e.g. "finish problem sheet" -> "Problem sheet 4"."""
-    want = _words(text)
-    scores = {g["id"]: len(want & _words(g["title"])) for g in pool}
+def _best_match(pool, text):
+    """Items by exact title, then part of a title, then the most shared words
+    ("finish problem sheet" -> "Problem sheet 4")."""
+    want = str(text).strip().lower()
+    exact = [x for x in pool if x["title"].lower() == want]
+    part = [x for x in pool if want in x["title"].lower()]
+    words = _words(want)
+    scores = {x["id"]: len(words & _words(x["title"])) for x in pool}
     best = max(scores.values(), default=0)
-    return [g for g in pool if best and scores[g["id"]] == best]
+    return exact or part or [x for x in pool if best and scores[x["id"]] == best]
+
+
+def _find_todo(todo, period=None, date=None):
+    """A to-do by id, or by title in the periods containing `date` (default today)."""
+    store.roll_todos()
+    found = store.get_todo(str(todo).strip())
+    if found:
+        return found
+    pool = _current_todos(_period_day(date), _period(period) if period else None)
+    matches = _best_match(pool, todo)
+    if len(matches) == 1:
+        return matches[0]
+    if matches:
+        options = "; ".join(f"id {t['id']}: {describe_todo(t)}" for t in matches)
+        raise ToolError(f"More than one to-do matches '{todo}': {options}. Ask the user which one, or pass its id.")
+    raise ToolError(f"There's no to-do matching '{todo}' in the current periods. "
+                    "Use list_todos (with a date for other periods) to find it.")
+
+
+def complete_todo(todo, period=None, date=None):
+    t = _find_todo(todo, period, date)
+    if t["done"]:
+        return Result(f"{describe_todo(t)} is already ticked off.")
+    store.set_todo_done(t["id"], True)
+    done, total = store.todos_progress(t["period"], t["period_start"])
+    return Result(f"Ticked off {describe_todo(t)} ({done}/{total} done).", changed=True)
+
+
+def uncomplete_todo(todo, period=None, date=None):
+    t = _find_todo(todo, period, date)
+    if not t["done"]:
+        return Result(f"{describe_todo(t)} isn't ticked.")
+    store.set_todo_done(t["id"], False)
+    return Result(f"Unticked {describe_todo(t)}.", changed=True)
+
+
+def delete_todo(todo, period=None, date=None, confirmed=False):
+    t = _find_todo(todo, period, date)
+    summary = f"Delete the to-do {describe_todo(t)}"
+    if not confirmed:
+        return Result("", pending=Pending(summary, lambda: delete_todo(t["id"], confirmed=True)))
+    store.delete_todo(t["id"])
+    return Result(f"Done: {summary}.", changed=True)
+
+
+def list_todos(period=None, date=None):
+    """To-dos (with ids) in the periods containing `date` (default today)."""
+    store.roll_todos()
+    day = _period_day(date)
+    sections = []
+    for per in ([_period(period)] if period else store.TODO_PERIODS):
+        start = store.start_of_period(per, day)
+        todos = store.todos_for(per, start)
+        done = sum(t["done"] for t in todos)
+        name = todo_list_name(per, start)
+        lines = [f"{name[0].upper()}{name[1:]}: {done}/{len(todos)} done"]
+        for t in todos:
+            extras = [x for x in ("repeats" if t["repeat"] else None, f"notes: {t['notes']}" if t["notes"] else None) if x]
+            lines.append(f"- [{'x' if t['done'] else ' '}] {t['title']} (id {t['id']}"
+                         + "".join(f"; {x}" for x in extras) + ")")
+        sections.append("\n".join(lines))
+    return Result("\n\n".join(sections))
+
+
+# ---------------------------------------------------------------------------
+# Goals: measurable monthly / yearly targets with progress
+# ---------------------------------------------------------------------------
+
+def _amount(goal, n=None):
+    """"7/12 sessions" for a goal (or n of its unit)."""
+    n = goal["value"] if n is None else n
+    return f"{store._num(n)}/{goal['target']}" + (f" {goal['unit']}" if goal["unit"] else "")
+
+
+def describe_goal(g):
+    when = store.period_title(g["period"], g["period_start"])
+    how = f", counted from the habit {g['habit']}" if g["habit"] else ""
+    return f"'{g['title']}' ({when}: {_amount(g)}{how})"
+
+
+def _habit_id(name):
+    if not name:
+        return None
+    found = store.find_habit(str(name))
+    if not found:
+        names = ", ".join(n for _, n in store.get_habits()) or "none yet"
+        raise ToolError(f"There's no habit called '{name}'. Existing habits: {names}.")
+    return found[0]
 
 
 def _find_goal(goal, period=None, date=None):
-    """A goal by id, or by title (exact, then partial) in the periods containing `date` (default today)."""
-    store.roll_goals()
+    """A goal by id, or by title in the month and year containing `date` (default today)."""
     found = store.get_goal(str(goal).strip())
     if found:
         return found
-    per = _period(period) if period else None
-    pool = _current_goals(_goal_day(date), per)
-    want = str(goal).strip().lower()
-    matches = ([g for g in pool if g["title"].lower() == want] or [g for g in pool if want in g["title"].lower()]
-               or _most_shared_words(pool, want))
+    day = _period_day(date)
+    periods = [_period(period, store.GOAL_PERIODS)] if period else store.GOAL_PERIODS
+    pool = [g for p in periods for g in store.goals_in(p, day)]
+    matches = _best_match(pool, goal)
     if len(matches) == 1:
         return matches[0]
     if matches:
         options = "; ".join(f"id {g['id']}: {describe_goal(g)}" for g in matches)
         raise ToolError(f"More than one goal matches '{goal}': {options}. Ask the user which one, or pass its id.")
-    raise ToolError(f"There's no goal matching '{goal}' in the current periods. "
-                    "Use list_goals (with a date for other periods) to find it.")
+    raise ToolError(f"There's no goal matching '{goal}' this month or year. Use list_goals to find it.")
 
 
-def complete_goal(goal, period=None, date=None):
+def add_goal(title, target, period="monthly", unit=None, habit=None, date=None):
+    """A measurable goal for the month or year containing `date` (default today)."""
+    per = _period(period, store.GOAL_PERIODS)
+    try:
+        target = float(target)
+    except (TypeError, ValueError):
+        raise ToolError("target must be a number, e.g. 12.")
+    if target <= 0:
+        raise ToolError("target must be more than 0.")
+    title = str(title).strip()
+    if not title:
+        raise ToolError("The goal needs a title.")
+    day = _period_day(date)
+    if any(g["title"].lower() == title.lower() for g in store.goals_in(per, day)):
+        return Result(f"There's already a goal called '{title}' for {store.period_title(per, day)}.")
+    g = store.add_goal(title, per, day, target, unit, _habit_id(habit))
+    return Result(f"Added the goal {describe_goal(g)}.", changed=True)
+
+
+def log_goal_progress(goal, amount=1, period=None, date=None):
+    """Add to a goal's progress (a negative amount takes some off)."""
     g = _find_goal(goal, period, date)
-    if g["done"]:
-        return Result(f"{describe_goal(g)} is already ticked off.")
-    store.set_goal_done(g["id"], True)
-    done, total = store.goals_progress(g["period"], g["period_start"])
-    return Result(f"Ticked off {describe_goal(g)} ({done}/{total} done).", changed=True)
+    if g["habit"]:
+        raise ToolError(f"{describe_goal(g)} counts the habit {g['habit']} automatically. "
+                        "Tick the habit instead (set_habit).")
+    store.add_goal_progress(g["id"], float(amount))
+    g = store.get_goal(g["id"])
+    return Result(f"Updated {describe_goal(g)}.", changed=True)
 
 
-def uncomplete_goal(goal, period=None, date=None):
+def set_goal_progress(goal, value, period=None, date=None):
+    """Set a goal's progress to an exact number."""
     g = _find_goal(goal, period, date)
-    if not g["done"]:
-        return Result(f"{describe_goal(g)} isn't ticked.")
-    store.set_goal_done(g["id"], False)
-    return Result(f"Unticked {describe_goal(g)}.", changed=True)
+    if g["habit"]:
+        raise ToolError(f"{describe_goal(g)} counts the habit {g['habit']} automatically; it can't be set by hand.")
+    old = g["value"]
+    store.set_goal_progress(g["id"], float(value))
+    g = store.get_goal(g["id"])
+    return Result(f"Set {describe_goal(g)} (was {store._num(old)}).", changed=True)
+
+
+def edit_goal(goal, title=None, target=None, unit=None, habit=None, unlink_habit=False, period=None, date=None):
+    """Change a goal's title, target, unit, or which habit (if any) it counts."""
+    g = _find_goal(goal, period, date)
+    changes = {}
+    if title:
+        changes["title"] = title
+    if target is not None:
+        if float(target) <= 0:
+            raise ToolError("target must be more than 0.")
+        changes["target"] = target
+    if unit is not None:
+        changes["unit"] = unit
+    if habit:
+        changes["habit_id"] = _habit_id(habit)
+    elif unlink_habit:
+        changes["habit_id"] = None
+    if not changes:
+        raise ToolError("Say what to change: title, target, unit, habit or unlink_habit.")
+    store.update_goal(g["id"], **changes)
+    return Result(f"Updated: {describe_goal(store.get_goal(g['id']))}.", changed=True)
 
 
 def delete_goal(goal, period=None, date=None, confirmed=False):
@@ -564,19 +700,14 @@ def delete_goal(goal, period=None, date=None, confirmed=False):
 
 
 def list_goals(period=None, date=None):
-    """Goals (with ids) in the periods containing `date` (default today)."""
-    store.roll_goals()
-    day = _goal_day(date)
-    sections = []
-    for per in ([_period(period)] if period else store.GOAL_PERIODS):
-        start = store.goal_period_start(per, day)
-        goals = store.goals_for(per, start)
-        done = sum(g["done"] for g in goals)
-        name = goal_list_name(per, start)
-        lines = [f"{name[0].upper()}{name[1:]}: {done}/{len(goals)} done"]
+    """Goals (with ids and progress) for the month and year containing `date` (default today)."""
+    day = _period_day(date)
+    lines = []
+    for per in ([_period(period, store.GOAL_PERIODS)] if period else store.GOAL_PERIODS):
+        goals = store.goals_in(per, day)
+        lines.append(f"{per.capitalize()} goals ({store.period_title(per, day)}):" + ("" if goals else " none"))
         for g in goals:
-            extras = [x for x in ("repeats" if g["repeat"] else None, f"notes: {g['notes']}" if g["notes"] else None) if x]
-            lines.append(f"- [{'x' if g['done'] else ' '}] {g['title']} (id {g['id']}"
-                         + "".join(f"; {x}" for x in extras) + ")")
-        sections.append("\n".join(lines))
-    return Result("\n\n".join(sections))
+            pct = round(100 * min(g["value"] / g["target"], 1))
+            how = f"; counts habit {g['habit']}" if g["habit"] else ""
+            lines.append(f"- {g['title']}: {_amount(g)} ({pct}%) (id {g['id']}{how})")
+    return Result("\n".join(lines))

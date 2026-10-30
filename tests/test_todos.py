@@ -1,0 +1,183 @@
+"""
+Goals: period maths, repeating goals, carry over, moves, export/import.
+Uses the throwaway database from the `store` fixture.
+"""
+
+from datetime import date
+
+import pandas as pd
+
+
+def test_period_starts(store):
+    friday = date(2026, 10, 30)
+    assert store.start_of_period("daily", friday) == friday
+    assert store.start_of_period("weekly", friday) == date(2026, 10, 26)
+    assert store.start_of_period("monthly", friday) == date(2026, 10, 1)
+    assert store.start_of_period("yearly", friday) == date(2026, 1, 1)
+    assert store.start_of_period("weekly", "2026-11-01") == date(2026, 10, 26)   # Sunday ends the week
+    assert store.start_of_period("weekly", "2026-11-02") == date(2026, 11, 2)    # Monday starts one
+
+
+def test_week_boundaries_across_month_and_year(store):
+    assert store.start_of_period("weekly", "2027-01-01") == date(2026, 12, 28)
+    assert store.end_of_period("weekly", date(2026, 12, 28)) == date(2027, 1, 3)
+    assert store.shift_period("weekly", date(2026, 10, 26), 1) == date(2026, 11, 2)
+    assert store.shift_period("weekly", date(2026, 10, 26), -1) == date(2026, 10, 19)
+
+
+def test_month_and_year_rollover(store):
+    assert store.shift_period("monthly", date(2026, 12, 1), 1) == date(2027, 1, 1)
+    assert store.shift_period("monthly", date(2026, 1, 1), -1) == date(2025, 12, 1)
+    assert store.shift_period("monthly", date(2026, 10, 1), 14) == date(2027, 12, 1)
+    assert store.shift_period("monthly", "2026-10-17", 1) == date(2026, 11, 1)    # any day of the month
+    assert store.end_of_period("monthly", date(2028, 2, 1)) == date(2028, 2, 29)
+    assert store.shift_period("yearly", date(2026, 1, 1), 1) == date(2027, 1, 1)
+    assert store.end_of_period("yearly", date(2026, 1, 1)) == date(2026, 12, 31)
+    assert store.shift_period("daily", date(2026, 12, 31), 1) == date(2027, 1, 1)
+
+
+def test_add_tick_order(store):
+    a = store.add_todo("Finish problem sheet", "weekly", "2026-10-30")
+    b = store.add_todo("Go gym", "weekly", "2026-10-28")
+    assert a["period_start"] == b["period_start"] == "2026-10-26"
+    assert [g["title"] for g in store.todos_for("weekly", "2026-11-01")] == ["Finish problem sheet", "Go gym"]
+
+    store.set_todo_done(a["id"], True)
+    done_at = store.get_todo(a["id"])["done_at"]
+    assert store.get_todo(a["id"])["done"] and done_at
+    store.set_todo_done(a["id"], True)                       # ticking again keeps the first time
+    assert store.get_todo(a["id"])["done_at"] == done_at
+    assert store.todos_progress("weekly", "2026-10-26") == (1, 2)
+    store.set_todo_done(a["id"], False)
+    assert store.get_todo(a["id"])["done_at"] is None
+
+    store.reorder_todos([b["id"], a["id"]])
+    assert [g["title"] for g in store.todos_for("weekly", "2026-10-26")] == ["Go gym", "Finish problem sheet"]
+
+
+def test_add_is_idempotent_by_id(store):
+    store.add_todo("Read", "daily", "2026-10-30", todo_id="g1")
+    store.add_todo("Read", "daily", "2026-10-30", todo_id="g1")
+    assert len(store.todos_for("daily", "2026-10-30")) == 1
+
+
+def test_update_and_delete(store):
+    g = store.add_todo("Read", "daily", "2026-10-30")
+    store.update_todo(g["id"], title="  Read 20 pages ", notes="the novel", repeat=True)
+    got = store.get_todo(g["id"])
+    assert (got["title"], got["notes"], got["repeat"]) == ("Read 20 pages", "the novel", True)
+    store.update_todo(g["id"], notes="  ")
+    assert store.get_todo(g["id"])["notes"] is None
+    store.delete_todo(g["id"])
+    assert store.get_todo(g["id"]) is None
+
+
+def test_move_to_another_period(store):
+    today = date(2026, 10, 30)
+    g = store.add_todo("Plan trip", "daily", today)
+    assert store.move_todo(g["id"], "monthly", today) == "2026-10-01"
+    # Moving from this month back to daily lands on today, not the 1st.
+    assert store.move_todo(g["id"], "daily", today) == "2026-10-30"
+    # A goal from another period keeps its own dates.
+    old = store.add_todo("Old", "weekly", "2026-09-07")
+    assert store.move_todo(old["id"], "daily", today) == "2026-09-07"
+    assert store.move_todo(old["id"], "yearly", today) == "2026-01-01"
+
+
+def test_repeating_goals_roll_over_once(store):
+    store.add_todo("Go gym", "weekly", "2026-10-26", repeat=True)
+    store.add_todo("One-off", "weekly", "2026-10-26")
+    store.add_todo("Stretch", "daily", "2026-10-29", repeat=True)
+    store.set_todo_done(store.todos_for("weekly", "2026-10-26")[0]["id"], True)
+
+    assert store.roll_todos(date(2026, 10, 30)) == 1          # Stretch for today; this week has its own
+    assert [g["title"] for g in store.todos_for("daily", "2026-10-30")] == ["Stretch"]
+
+    assert store.roll_todos(date(2026, 11, 2)) == 2           # a new week and a new day
+    week = store.todos_for("weekly", "2026-11-02")
+    assert [(g["title"], g["done"], g["repeat"]) for g in week] == [("Go gym", False, True)]
+
+    assert store.roll_todos(date(2026, 11, 2)) == 0           # no duplicates
+    store.delete_todo(week[0]["id"])
+    assert store.roll_todos(date(2026, 11, 3)) == 1           # only the new day; the deleted copy stays gone
+    assert store.todos_for("weekly", "2026-11-02") == []
+
+
+def test_roll_skips_titles_already_there_and_repeat_off(store):
+    store.add_todo("Read", "monthly", "2026-10-01", repeat=True)
+    store.add_todo("read", "monthly", "2026-11-01")           # already there (any case)
+    store.add_todo("Tidy", "monthly", "2026-09-01", repeat=True)
+    tidy = store.add_todo("Tidy", "monthly", "2026-10-01")    # latest copy has repeat off
+    assert store.get_todo(tidy["id"])["repeat"] is False
+    assert store.roll_todos(date(2026, 11, 15)) == 0
+    assert [g["title"] for g in store.todos_for("monthly", "2026-11-01")] == ["read"]
+
+
+def test_roll_after_a_gap_and_across_the_year(store):
+    store.add_todo("Budget", "monthly", "2026-12-01", repeat=True)
+    store.roll_todos(date(2027, 1, 20))
+    assert [g["title"] for g in store.todos_for("monthly", "2027-01-01")] == ["Budget"]
+
+
+def test_carry_over(store):
+    a = store.add_todo("Essay", "weekly", "2026-10-26", notes="draft 2")
+    store.add_todo("Done thing", "weekly", "2026-10-26")
+    store.add_todo("Laundry", "weekly", "2026-10-26")
+    store.set_todo_done(store.todos_for("weekly", "2026-10-26")[1]["id"], True)
+    store.add_todo("laundry", "weekly", "2026-11-02")         # already in next week
+
+    assert store.carry_over("weekly", "2026-10-30") == 1
+    nxt = store.todos_for("weekly", "2026-11-02")
+    assert [(g["title"], g["notes"], g["done"]) for g in nxt] == [("laundry", None, False), ("Essay", "draft 2", False)]
+    assert store.get_todo(a["id"])["period_start"] == "2026-10-26"   # the original stays
+    assert store.carry_over("weekly", "2026-10-26") == 0             # carrying twice doubles nothing
+
+    store.add_todo("Year end", "monthly", "2026-12-01")
+    assert store.carry_over("monthly", "2026-12-01") == 1
+    assert [g["title"] for g in store.todos_for("monthly", "2027-01-01")] == ["Year end"]
+
+
+def test_export_import_round_trip(store):
+    g = store.add_todo("Run 5k", "monthly", "2026-10-05", notes="park", repeat=True)
+    store.set_todo_done(g["id"], True)
+    store.add_todo("Learn Spanish", "daily", "2026-03-01")
+    csv = store.load_todos().to_csv(index=False)
+
+    store.delete_todo(g["id"])
+    from io import StringIO
+    assert store.save_todos(pd.read_csv(StringIO(csv))) == 2
+    got = store.get_todo(g["id"])
+    assert (got["title"], got["notes"], got["period_start"], got["done"], got["repeat"]) == (
+        "Run 5k", "park", "2026-10-01", True, True)
+    assert len(store.load_todos()) == 2                        # merge updated, didn't double
+
+    # Minimal rows: title + period (+ any date in the period); bad rows are skipped.
+    rows = pd.DataFrame({"title": ["Ship it", "", "Bad"], "period": ["Weekly", "daily", "fortnightly"],
+                         "period_start": ["2026-10-29", None, None]})
+    assert store.save_todos(rows, replace=True) == 1
+    assert [(r["title"], r["period_start"]) for r in store.load_todos().to_dict("records")] == [("Ship it", "2026-10-26")]
+
+
+def test_backups_include_goals(store):
+    import sqlite3
+
+    import setup_checks
+    store.add_todo("Go gym", "weekly", "2026-10-30")
+    path = setup_checks.backup_now()
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("SELECT title FROM todos").fetchall() == [("Go gym",)]
+
+
+def test_period_titles(store):
+    today = date(2026, 10, 30)
+    t = lambda p, d: store.period_title(p, date.fromisoformat(d), today)
+    assert t("daily", "2026-10-30") == "Today"
+    assert t("daily", "2026-10-29") == "Yesterday"
+    assert t("daily", "2026-11-04") == "Wed 4 Nov"
+    assert t("daily", "2027-01-04") == "Mon 4 Jan 2027"
+    assert t("weekly", "2026-10-28") == "This week: 26 Oct to 1 Nov"
+    assert t("weekly", "2026-11-02") == "Next week: 2 to 8 Nov"
+    assert t("weekly", "2026-10-12") == "12 to 18 Oct"
+    assert t("weekly", "2026-12-28") == "28 Dec 2026 to 3 Jan 2027"
+    assert t("monthly", "2026-11-09") == "November 2026"
+    assert t("yearly", "2026-11-09") == "2026"

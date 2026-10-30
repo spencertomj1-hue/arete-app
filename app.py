@@ -16,6 +16,7 @@ import streamlit as st
 import chat
 import daily_log
 import goals
+import todos
 import settings_ui
 import store
 import timetable
@@ -75,13 +76,14 @@ def _agenda():
 
 
 def page_home():
-    """Landing page: agenda + today's Plan / Actual on the left, the Ask box and goal cards on the right."""
+    """Landing page: agenda + today's Plan / Actual on the left; the Ask box, to-dos and goals on the right."""
     left, right = st.columns([2, 3], gap="large")
     with left:
         _agenda()
         timetable.render_today()
     with right:
         chat.render(inline=True)
+        todos.render_home()
         goals.render_home()
 
 
@@ -214,7 +216,7 @@ PAGES = {
 }
 
 st.sidebar.title("Arete")
-# Keyed so the Home goal cards' "See all" can switch to the Goals page.
+# Keyed so Home's goals "See all" can switch to the Goals page.
 choice = st.sidebar.radio("Go to", list(PAGES), label_visibility="collapsed", key="page")
 PAGES[choice]()
 

@@ -79,6 +79,7 @@ def init_db():
     """Create tables if they don't exist yet, and seed the timetable key."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with db() as conn:
+        _goals_became_todos(conn)
         conn.executescript(
             """
             -- One row per day
@@ -149,23 +150,37 @@ def init_db():
             -- Kept across syncs (uids are stable per occurrence), so they stay gone.
             CREATE TABLE IF NOT EXISTS tt_outlook_hidden (uid TEXT PRIMARY KEY);
 
-            -- Goals: to-dos for a day, week, month or year
-            CREATE TABLE IF NOT EXISTS goals (
+            -- To-dos for a day, week or month
+            CREATE TABLE IF NOT EXISTS todos (
                 id           TEXT PRIMARY KEY,
                 title        TEXT NOT NULL,
                 notes        TEXT,
                 period       TEXT NOT NULL CHECK (period IN ('daily', 'weekly', 'monthly', 'yearly')),
-                period_start TEXT NOT NULL,              -- the day / Monday / 1st of the month / 1 Jan
+                period_start TEXT NOT NULL,              -- the day / Monday / 1st of the month
                 done         INTEGER NOT NULL DEFAULT 0,
                 done_at      TEXT,                       -- ISO timestamp, NULL while unticked
                 "repeat"     INTEGER NOT NULL DEFAULT 0, -- 1 = a fresh copy every new period
                 ord          INTEGER NOT NULL DEFAULT 0, -- position in its list
                 created_at   TEXT NOT NULL
             );
-            CREATE INDEX IF NOT EXISTS goals_period ON goals (period, period_start);
+            CREATE INDEX IF NOT EXISTS todos_period ON todos (period, period_start);
 
-            -- The last period each kind of repeating goal was copied into (see roll_goals).
-            CREATE TABLE IF NOT EXISTS goal_rollover (period TEXT PRIMARY KEY, period_start TEXT NOT NULL);
+            -- The last period each kind of repeating to-do was copied into (see roll_todos).
+            CREATE TABLE IF NOT EXISTS todo_rollover (period TEXT PRIMARY KEY, period_start TEXT NOT NULL);
+
+            -- Goals: measurable targets for a month or a year, e.g. "Gym 12 sessions"
+            CREATE TABLE IF NOT EXISTS goals (
+                id           TEXT PRIMARY KEY,
+                title        TEXT NOT NULL,
+                period       TEXT NOT NULL CHECK (period IN ('monthly', 'yearly')),
+                period_start TEXT NOT NULL,              -- the 1st of the month / 1 Jan
+                target       REAL NOT NULL,
+                unit         TEXT,                       -- e.g. "sessions", "km"; NULL = just a number
+                progress     REAL NOT NULL DEFAULT 0,    -- updated by hand (unused while linked to a habit)
+                habit_id     INTEGER REFERENCES habits(id) ON DELETE SET NULL,   -- counts that habit's ticks
+                ord          INTEGER NOT NULL DEFAULT 0,
+                created_at   TEXT NOT NULL
+            );
             """
         )
         # Columns added after the first release.
@@ -201,6 +216,28 @@ def save_settings(**changes):
     settings_path().parent.mkdir(parents=True, exist_ok=True)
     settings_path().write_text(json.dumps(settings, indent=2))
     return settings
+
+
+def _goals_became_todos(conn):
+    """
+    Early versions called the to-do lists "goals". If this database has that old
+    table, back it up, rename it (and its rollover table) to todos, and drop the
+    yearly to-dos, which no longer exist. The new goals table is then created fresh.
+    """
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(goals)")}
+    if "done" not in columns:
+        return
+    backups = DATA_DIR / "backups"
+    backups.mkdir(parents=True, exist_ok=True)
+    copy = sqlite3.connect(backups / f"life-{datetime.now():%Y-%m-%d-%H%M%S}-before-todos.db")
+    conn.backup(copy)
+    copy.close()
+    conn.execute("ALTER TABLE goals RENAME TO todos")
+    conn.execute("DROP INDEX IF EXISTS goals_period")
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'goal_rollover'").fetchone():
+        conn.execute("ALTER TABLE goal_rollover RENAME TO todo_rollover")
+        conn.execute("DELETE FROM todo_rollover WHERE period = 'yearly'")
+    conn.execute("DELETE FROM todos WHERE period = 'yearly'")
 
 
 def _add_column(conn, table, column, kind):
@@ -748,15 +785,16 @@ def outlook_overlaps(day, s, e):
 
 
 # ---------------------------------------------------------------------------
-# Goals: to-dos for a day, a week (Monday to Sunday), a month or a year.
+# Periods, and to-dos for a day, a week (Monday to Sunday) or a month.
 #
-# Each goal belongs to one period, identified by its first day (period_start).
-# Repeating goals get a fresh unticked copy when a new period starts (roll_goals).
+# Each to-do (and each goal, below) belongs to one period, identified by its
+# first day (period_start); the period maths here is shared by both.
+# Repeating to-dos get a fresh unticked copy when a new period starts (roll_todos).
 # "Today" is always the Europe/London date.
 # ---------------------------------------------------------------------------
 
-GOAL_PERIODS = ("daily", "weekly", "monthly", "yearly")
-GOAL_COLS = 'id, title, notes, period, period_start, done, done_at, "repeat", ord, created_at'
+TODO_PERIODS = ("daily", "weekly", "monthly")
+TODO_COLS = 'id, title, notes, period, period_start, done, done_at, "repeat", ord, created_at'
 TZ = ZoneInfo("Europe/London")
 
 
@@ -768,7 +806,7 @@ def _as_date(day):
     return day if isinstance(day, date) else date.fromisoformat(str(day))
 
 
-def goal_period_start(period, day):
+def start_of_period(period, day):
     """First day of the period containing `day`: the day, its Monday, the 1st, or 1 Jan."""
     day = _as_date(day)
     if period == "daily":
@@ -779,12 +817,12 @@ def goal_period_start(period, day):
         return day.replace(day=1)
     if period == "yearly":
         return day.replace(month=1, day=1)
-    raise ValueError(f"Unknown goal period: {period}")
+    raise ValueError(f"Unknown todo period: {period}")
 
 
 def shift_period(period, start, n):
     """The start of the period n periods after (or before, n < 0) the one starting at `start`."""
-    start = goal_period_start(period, start)
+    start = start_of_period(period, start)
     if period == "daily":
         return start + timedelta(days=n)
     if period == "weekly":
@@ -795,12 +833,12 @@ def shift_period(period, start, n):
     return start.replace(year=start.year + n)
 
 
-def goal_period_end(period, start):
+def end_of_period(period, start):
     """Last day of the period starting at `start`."""
     return shift_period(period, start, 1) - timedelta(days=1)
 
 
-def _goal(row):
+def _todo(row):
     g = dict(row)
     g["done"], g["repeat"] = bool(g["done"]), bool(g["repeat"])
     return g
@@ -816,16 +854,16 @@ def period_title(period, start, today=None):
     "Last week: ...", "19 to 25 Oct", "November 2026", "2026".
     """
     today = today or london_today()
-    start = goal_period_start(period, start)
+    start = start_of_period(period, start)
     if period == "daily":
         named = {0: "Today", -1: "Yesterday", 1: "Tomorrow"}.get((start - today).days)
         return named or f"{start:%a} {start.day} {start:%b}" + (f" {start.year}" if start.year != today.year else "")
     if period == "weekly":
-        end = goal_period_end(period, start)
+        end = end_of_period(period, start)
         other_year = end.year != today.year
         span = (f"{start.day} to {_short(end, other_year)}" if start.month == end.month
                 else f"{_short(start, start.year != end.year)} to {_short(end, other_year)}")
-        weeks = (start - goal_period_start("weekly", today)).days // 7
+        weeks = (start - start_of_period("weekly", today)).days // 7
         named = {0: "This week", -1: "Last week", 1: "Next week"}.get(weeks)
         return f"{named}: {span}" if named else span
     if period == "monthly":
@@ -833,68 +871,68 @@ def period_title(period, start, today=None):
     return str(start.year)
 
 
-def goals_for(period, start):
-    """The goals of one period, in list order."""
-    start = goal_period_start(period, start).isoformat()
+def todos_for(period, start):
+    """The to-dos of one period, in list order."""
+    start = start_of_period(period, start).isoformat()
     with db() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            f"SELECT {GOAL_COLS} FROM goals WHERE period = ? AND period_start = ? ORDER BY ord, created_at",
+            f"SELECT {TODO_COLS} FROM todos WHERE period = ? AND period_start = ? ORDER BY ord, created_at",
             (period, start),
         ).fetchall()
-    return [_goal(r) for r in rows]
+    return [_todo(r) for r in rows]
 
 
-def get_goal(goal_id):
+def get_todo(todo_id):
     with db() as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(f"SELECT {GOAL_COLS} FROM goals WHERE id = ?", (goal_id,)).fetchone()
-    return _goal(row) if row else None
+        row = conn.execute(f"SELECT {TODO_COLS} FROM todos WHERE id = ?", (todo_id,)).fetchone()
+    return _todo(row) if row else None
 
 
 def _next_ord(conn, period, start):
-    return conn.execute("SELECT COALESCE(MAX(ord) + 1, 0) FROM goals WHERE period = ? AND period_start = ?",
+    return conn.execute("SELECT COALESCE(MAX(ord) + 1, 0) FROM todos WHERE period = ? AND period_start = ?",
                         (period, start)).fetchone()[0]
 
 
-def _insert_goal(conn, title, period, start, notes=None, repeat=False, goal_id=None):
-    """Add a goal at the end of its list. Idempotent for a given id (the goal list replays ops)."""
-    goal_id = goal_id or uuid.uuid4().hex
+def _insert_todo(conn, title, period, start, notes=None, repeat=False, todo_id=None):
+    """Add a to-do at the end of its list. Idempotent for a given id (the to-do list replays ops)."""
+    todo_id = todo_id or uuid.uuid4().hex
     conn.execute(
-        f"INSERT OR IGNORE INTO goals ({GOAL_COLS}) VALUES (?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)",
-        (goal_id, title, notes, period, start, int(bool(repeat)), _next_ord(conn, period, start),
+        f"INSERT OR IGNORE INTO todos ({TODO_COLS}) VALUES (?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)",
+        (todo_id, title, notes, period, start, int(bool(repeat)), _next_ord(conn, period, start),
          datetime.now(TZ).isoformat(timespec="seconds")),
     )
-    return goal_id
+    return todo_id
 
 
-def add_goal(title, period, day, notes=None, repeat=False, goal_id=None):
-    """Add a goal to the period containing `day`; returns it."""
+def add_todo(title, period, day, notes=None, repeat=False, todo_id=None):
+    """Add a to-do to the period containing `day`; returns it."""
     title = str(title).strip()
     if not title:
-        raise ValueError("A goal needs a title.")
-    start = goal_period_start(period, day).isoformat()
+        raise ValueError("A todo needs a title.")
+    start = start_of_period(period, day).isoformat()
     with db() as conn:
-        goal_id = _insert_goal(conn, title, period, start, notes or None, repeat, goal_id)
-    return get_goal(goal_id)
+        todo_id = _insert_todo(conn, title, period, start, notes or None, repeat, todo_id)
+    return get_todo(todo_id)
 
 
-def set_goal_done(goal_id, done):
-    """Tick or untick a goal (done_at records when it was ticked)."""
+def set_todo_done(todo_id, done):
+    """Tick or untick a to-do (done_at records when it was ticked)."""
     with db() as conn:
         conn.execute(
-            "UPDATE goals SET done = ?, done_at = CASE WHEN ? THEN COALESCE(done_at, ?) END WHERE id = ?",
-            (int(bool(done)), int(bool(done)), datetime.now(TZ).isoformat(timespec="seconds"), goal_id),
+            "UPDATE todos SET done = ?, done_at = CASE WHEN ? THEN COALESCE(done_at, ?) END WHERE id = ?",
+            (int(bool(done)), int(bool(done)), datetime.now(TZ).isoformat(timespec="seconds"), todo_id),
         )
 
 
-def update_goal(goal_id, **changes):
-    """Change a goal's title, notes and/or repeat flag."""
+def update_todo(todo_id, **changes):
+    """Change a to-do's title, notes and/or repeat flag."""
     fields = {k: v for k, v in changes.items() if k in ("title", "notes", "repeat")}
     if "title" in fields:
         fields["title"] = str(fields["title"]).strip()
         if not fields["title"]:
-            raise ValueError("A goal needs a title.")
+            raise ValueError("A todo needs a title.")
     if "notes" in fields:
         fields["notes"] = (str(fields["notes"]).strip() if fields["notes"] is not None else "") or None
     if "repeat" in fields:
@@ -903,30 +941,250 @@ def update_goal(goal_id, **changes):
         return
     sets = ", ".join(f'"{k}" = ?' for k in fields)
     with db() as conn:
-        conn.execute(f"UPDATE goals SET {sets} WHERE id = ?", (*fields.values(), goal_id))
+        conn.execute(f"UPDATE todos SET {sets} WHERE id = ?", (*fields.values(), todo_id))
 
 
-def move_target(goal, period, today=None):
+def move_target(todo, period, today=None):
     """
-    Where a goal lands when moved to another kind of period: the period containing
+    Where a to-do lands when moved to another kind of period: the period containing
     today if its current period includes today, otherwise its own first day.
     """
     today = today or london_today()
-    start = date.fromisoformat(goal["period_start"])
-    anchor = today if start <= today <= goal_period_end(goal["period"], start) else start
-    return goal_period_start(period, anchor)
+    start = date.fromisoformat(todo["period_start"])
+    anchor = today if start <= today <= end_of_period(todo["period"], start) else start
+    return start_of_period(period, anchor)
 
 
-def move_goal(goal_id, period, today=None):
-    """Move a goal to another kind of period (to the end of that list). Returns the new period start."""
-    goal = get_goal(goal_id)
-    if not goal:
+def move_todo(todo_id, period, today=None):
+    """Move a to-do to another kind of period (to the end of that list). Returns the new period start."""
+    todo = get_todo(todo_id)
+    if not todo:
         return None
-    start = move_target(goal, period, today).isoformat()
+    start = move_target(todo, period, today).isoformat()
     with db() as conn:
-        conn.execute("UPDATE goals SET period = ?, period_start = ?, ord = ? WHERE id = ?",
-                     (period, start, _next_ord(conn, period, start), goal_id))
+        conn.execute("UPDATE todos SET period = ?, period_start = ?, ord = ? WHERE id = ?",
+                     (period, start, _next_ord(conn, period, start), todo_id))
     return start
+
+
+def delete_todo(todo_id):
+    with db() as conn:
+        conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
+
+
+def reorder_todos(ids):
+    """Put to-dos in this order (ids of one list, first to last)."""
+    with db() as conn:
+        conn.executemany("UPDATE todos SET ord = ? WHERE id = ?", [(i, gid) for i, gid in enumerate(ids)])
+
+
+def _titles(conn, period, start):
+    rows = conn.execute("SELECT lower(title) FROM todos WHERE period = ? AND period_start = ?", (period, start))
+    return {r[0] for r in rows}
+
+
+def roll_todos(today=None):
+    """
+    Give every repeating to-do an unticked copy in the current period, once per
+    period (todo_rollover remembers the last one done, so a copy the user deletes
+    stays deleted). A to-do repeats if the latest to-do with its title in an earlier
+    period has repeat on. Titles already in the current period are never doubled.
+    Returns how many copies were made.
+    """
+    today = today or london_today()
+    made = 0
+    with db() as conn:
+        for period in TODO_PERIODS:
+            start = start_of_period(period, today).isoformat()
+            done = conn.execute("SELECT period_start FROM todo_rollover WHERE period = ?", (period,)).fetchone()
+            if done and done[0] >= start:
+                continue
+            latest = {}
+            for title, notes, repeat in conn.execute(
+                'SELECT title, notes, "repeat" FROM todos WHERE period = ? AND period_start < ? '
+                "ORDER BY period_start DESC, ord",
+                (period, start),
+            ):
+                latest.setdefault(title.lower(), (title, notes, repeat))
+            existing = _titles(conn, period, start)
+            for key, (title, notes, repeat) in latest.items():
+                if repeat and key not in existing:
+                    _insert_todo(conn, title, period, start, notes, True)
+                    made += 1
+            conn.execute("INSERT OR REPLACE INTO todo_rollover VALUES (?, ?)", (period, start))
+    return made
+
+
+def carry_over(period, start):
+    """Copy a period's unticked to-dos into the next period (skipping titles already there). Returns the count."""
+    start = start_of_period(period, start).isoformat()
+    nxt = shift_period(period, start, 1).isoformat()
+    copied = 0
+    with db() as conn:
+        existing = _titles(conn, period, nxt)
+        rows = conn.execute(
+            'SELECT title, notes, "repeat" FROM todos WHERE period = ? AND period_start = ? AND done = 0 ORDER BY ord',
+            (period, start),
+        ).fetchall()
+        for title, notes, repeat in rows:
+            if title.lower() not in existing:
+                _insert_todo(conn, title, period, nxt, notes, repeat)
+                existing.add(title.lower())
+                copied += 1
+    return copied
+
+
+def todos_progress(period, start):
+    """(done, total) for one period."""
+    todos = todos_for(period, start)
+    return sum(g["done"] for g in todos), len(todos)
+
+
+def load_todos():
+    """Every to-do, for export: one row each, oldest period first."""
+    return _read(f"SELECT {TODO_COLS} FROM todos ORDER BY period_start, period, ord")
+
+
+def save_todos(df, replace=False):
+    """
+    Import to-dos (the export's columns; only title and period are required).
+    Rows with an id that already exists update that to-do; replace=True wipes all to-dos first.
+    Returns how many rows were imported.
+    """
+    count = 0
+    with db() as conn:
+        if replace:
+            conn.execute("DELETE FROM todos")
+            conn.execute("DELETE FROM todo_rollover")
+        for row in df.to_dict("records"):
+            title = _clean(row.get("title"), str)
+            period = (_clean(row.get("period"), str) or "").strip().lower()
+            if not title or period not in TODO_PERIODS:
+                continue
+            day = _clean(row.get("period_start"), str)
+            start = start_of_period(period, pd.to_datetime(day).date() if day else london_today()).isoformat()
+            done = _is_ticked(row.get("done"))
+            ord_ = _clean(row.get("ord"), int)
+            conn.execute(
+                f"INSERT OR REPLACE INTO todos ({TODO_COLS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (_clean(row.get("id"), str) or uuid.uuid4().hex, title.strip(), _clean(row.get("notes"), str),
+                 period, start, int(done), _clean(row.get("done_at"), str) if done else None,
+                 int(_is_ticked(row.get("repeat"))),
+                 _next_ord(conn, period, start) if ord_ is None else ord_,
+                 _clean(row.get("created_at"), str) or datetime.now(TZ).isoformat(timespec="seconds")),
+            )
+            count += 1
+    return count
+
+
+# ---------------------------------------------------------------------------
+# Goals: measurable targets for a month or a year ("Gym 12 sessions").
+#
+# Progress is either a number the user updates (`progress`), or, when the goal
+# is linked to a habit, the number of days that habit was ticked in the period.
+# ---------------------------------------------------------------------------
+
+GOAL_PERIODS = ("monthly", "yearly")
+GOAL_COLS = "id, title, period, period_start, target, unit, progress, habit_id, ord, created_at"
+
+
+def _num(x):
+    """12.0 -> 12, so whole numbers read naturally."""
+    return int(x) if float(x).is_integer() else float(x)
+
+
+def _with_value(conn, row):
+    """A goal row plus `value` (its current progress) and `habit` (the linked habit's name, or None)."""
+    g = dict(row)
+    g["target"], g["progress"] = _num(g["target"]), _num(g["progress"])
+    g["habit"] = None
+    g["value"] = g["progress"]
+    if g["habit_id"] is not None:
+        name = conn.execute("SELECT name FROM habits WHERE id = ?", (g["habit_id"],)).fetchone()
+        end = end_of_period(g["period"], g["period_start"]).isoformat()
+        g["habit"] = name[0] if name else None
+        g["value"] = conn.execute(
+            "SELECT COUNT(*) FROM habit_log WHERE habit_id = ? AND date BETWEEN ? AND ?",
+            (g["habit_id"], g["period_start"], end),
+        ).fetchone()[0]
+    return g
+
+
+def goals_in(period, start):
+    """The goals of one month or year, in list order, each with its current `value`."""
+    start = start_of_period(period, start).isoformat()
+    with db() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(f"SELECT {GOAL_COLS} FROM goals WHERE period = ? AND period_start = ? ORDER BY ord, created_at",
+                            (period, start)).fetchall()
+        return [_with_value(conn, r) for r in rows]
+
+
+def get_goal(goal_id):
+    with db() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(f"SELECT {GOAL_COLS} FROM goals WHERE id = ?", (goal_id,)).fetchone()
+        return _with_value(conn, row) if row else None
+
+
+def _check_target(target):
+    target = float(target)
+    if target <= 0:
+        raise ValueError("A goal's target must be more than 0.")
+    return target
+
+
+def add_goal(title, period, day, target, unit=None, habit_id=None, goal_id=None):
+    """Add a goal to the month or year containing `day`; returns it."""
+    title = str(title).strip()
+    if not title:
+        raise ValueError("A goal needs a title.")
+    if period not in GOAL_PERIODS:
+        raise ValueError(f"Goals are monthly or yearly, not {period}.")
+    start = start_of_period(period, day).isoformat()
+    goal_id = goal_id or uuid.uuid4().hex
+    with db() as conn:
+        conn.execute(
+            f"INSERT OR IGNORE INTO goals ({GOAL_COLS}) VALUES (?, ?, ?, ?, ?, ?, 0, ?, "
+            "(SELECT COALESCE(MAX(ord) + 1, 0) FROM goals WHERE period = ? AND period_start = ?), ?)",
+            (goal_id, title, period, start, _check_target(target), (unit or "").strip() or None, habit_id,
+             period, start, datetime.now(TZ).isoformat(timespec="seconds")),
+        )
+    return get_goal(goal_id)
+
+
+KEEP = object()   # update_goal: leave this field as it is
+
+
+def update_goal(goal_id, title=KEEP, target=KEEP, unit=KEEP, habit_id=KEEP):
+    """Change a goal's title, target, unit or linked habit (habit_id=None unlinks it)."""
+    fields = {}
+    if title is not KEEP:
+        fields["title"] = str(title).strip()
+        if not fields["title"]:
+            raise ValueError("A goal needs a title.")
+    if target is not KEEP:
+        fields["target"] = _check_target(target)
+    if unit is not KEEP:
+        fields["unit"] = (unit or "").strip() or None
+    if habit_id is not KEEP:
+        fields["habit_id"] = habit_id
+    if fields:
+        with db() as conn:
+            conn.execute(f"UPDATE goals SET {', '.join(f'{k} = ?' for k in fields)} WHERE id = ?",
+                         (*fields.values(), goal_id))
+
+
+def set_goal_progress(goal_id, value):
+    """Set a goal's hand-updated progress (never below 0)."""
+    with db() as conn:
+        conn.execute("UPDATE goals SET progress = MAX(0, ?) WHERE id = ?", (float(value), goal_id))
+
+
+def add_goal_progress(goal_id, amount):
+    """Add to (or, with a negative amount, take from) a goal's hand-updated progress."""
+    with db() as conn:
+        conn.execute("UPDATE goals SET progress = MAX(0, progress + ?) WHERE id = ?", (float(amount), goal_id))
 
 
 def delete_goal(goal_id):
@@ -935,104 +1193,44 @@ def delete_goal(goal_id):
 
 
 def reorder_goals(ids):
-    """Put goals in this order (ids of one list, first to last)."""
     with db() as conn:
         conn.executemany("UPDATE goals SET ord = ? WHERE id = ?", [(i, gid) for i, gid in enumerate(ids)])
 
 
-def _titles(conn, period, start):
-    rows = conn.execute("SELECT lower(title) FROM goals WHERE period = ? AND period_start = ?", (period, start))
-    return {r[0] for r in rows}
-
-
-def roll_goals(today=None):
-    """
-    Give every repeating goal an unticked copy in the current period, once per
-    period (goal_rollover remembers the last one done, so a copy the user deletes
-    stays deleted). A goal repeats if the latest goal with its title in an earlier
-    period has repeat on. Titles already in the current period are never doubled.
-    Returns how many copies were made.
-    """
-    today = today or london_today()
-    made = 0
-    with db() as conn:
-        for period in GOAL_PERIODS:
-            start = goal_period_start(period, today).isoformat()
-            done = conn.execute("SELECT period_start FROM goal_rollover WHERE period = ?", (period,)).fetchone()
-            if done and done[0] >= start:
-                continue
-            latest = {}
-            for title, notes, repeat in conn.execute(
-                'SELECT title, notes, "repeat" FROM goals WHERE period = ? AND period_start < ? '
-                "ORDER BY period_start DESC, ord",
-                (period, start),
-            ):
-                latest.setdefault(title.lower(), (title, notes, repeat))
-            existing = _titles(conn, period, start)
-            for key, (title, notes, repeat) in latest.items():
-                if repeat and key not in existing:
-                    _insert_goal(conn, title, period, start, notes, True)
-                    made += 1
-            conn.execute("INSERT OR REPLACE INTO goal_rollover VALUES (?, ?)", (period, start))
-    return made
-
-
-def carry_over(period, start):
-    """Copy a period's unticked goals into the next period (skipping titles already there). Returns the count."""
-    start = goal_period_start(period, start).isoformat()
-    nxt = shift_period(period, start, 1).isoformat()
-    copied = 0
-    with db() as conn:
-        existing = _titles(conn, period, nxt)
-        rows = conn.execute(
-            'SELECT title, notes, "repeat" FROM goals WHERE period = ? AND period_start = ? AND done = 0 ORDER BY ord',
-            (period, start),
-        ).fetchall()
-        for title, notes, repeat in rows:
-            if title.lower() not in existing:
-                _insert_goal(conn, title, period, nxt, notes, repeat)
-                existing.add(title.lower())
-                copied += 1
-    return copied
-
-
-def goals_progress(period, start):
-    """(done, total) for one period."""
-    goals = goals_for(period, start)
-    return sum(g["done"] for g in goals), len(goals)
-
-
 def load_goals():
-    """Every goal, for export: one row each, oldest period first."""
-    return _read(f"SELECT {GOAL_COLS} FROM goals ORDER BY period_start, period, ord")
+    """Every goal, for export (the linked habit by name, so the CSV makes sense on its own)."""
+    return _read(f"""SELECT g.id, g.title, g.period, g.period_start, g.target, g.unit, g.progress,
+                            h.name AS habit, g.ord, g.created_at
+                     FROM goals g LEFT JOIN habits h ON h.id = g.habit_id
+                     ORDER BY g.period_start, g.period, g.ord""")
 
 
 def save_goals(df, replace=False):
     """
-    Import goals (the export's columns; only title and period are required).
-    Rows with an id that already exists update that goal; replace=True wipes all goals first.
-    Returns how many rows were imported.
+    Import goals (the export's columns; title, period and target are required).
+    A habit name that doesn't exist is ignored (the goal is then updated by hand).
+    Rows with an existing id update that goal; replace=True wipes all goals first. Returns the count.
     """
     count = 0
     with db() as conn:
         if replace:
             conn.execute("DELETE FROM goals")
-            conn.execute("DELETE FROM goal_rollover")
+        habits = {name.lower(): hid for hid, name in conn.execute("SELECT id, name FROM habits")}
         for row in df.to_dict("records"):
             title = _clean(row.get("title"), str)
             period = (_clean(row.get("period"), str) or "").strip().lower()
-            if not title or period not in GOAL_PERIODS:
+            target = _clean(row.get("target"), float)
+            if not title or period not in GOAL_PERIODS or not target or target <= 0:
                 continue
             day = _clean(row.get("period_start"), str)
-            start = goal_period_start(period, pd.to_datetime(day).date() if day else london_today()).isoformat()
-            done = _is_ticked(row.get("done"))
+            start = start_of_period(period, pd.to_datetime(day).date() if day else london_today()).isoformat()
+            habit = _clean(row.get("habit"), str)
             ord_ = _clean(row.get("ord"), int)
             conn.execute(
                 f"INSERT OR REPLACE INTO goals ({GOAL_COLS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (_clean(row.get("id"), str) or uuid.uuid4().hex, title.strip(), _clean(row.get("notes"), str),
-                 period, start, int(done), _clean(row.get("done_at"), str) if done else None,
-                 int(_is_ticked(row.get("repeat"))),
-                 _next_ord(conn, period, start) if ord_ is None else ord_,
+                (_clean(row.get("id"), str) or uuid.uuid4().hex, title.strip(), period, start, target,
+                 _clean(row.get("unit"), str), max(0.0, _clean(row.get("progress"), float) or 0.0),
+                 habits.get(habit.strip().lower()) if habit else None, count if ord_ is None else ord_,
                  _clean(row.get("created_at"), str) or datetime.now(TZ).isoformat(timespec="seconds")),
             )
             count += 1

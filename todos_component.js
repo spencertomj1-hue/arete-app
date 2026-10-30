@@ -1,32 +1,26 @@
-// Goal lists in the style of Apple Reminders, used by the Goals page (four
-// sections with period navigation) and the Home page (three compact cards).
+// To-do lists in the style of Apple Reminders: the Home page's three compact
+// cards (today, this week, this month).
 //
-// Python passes { today, compact, sections: [{period, name, start, title, current,
-// goals, limit}], acked }, where goals are the rows of that section's period.
+// Python passes { today, sections: [{period, start, title, goals, limit}], acked },
+// where goals are the to-do rows of that section's period.
 // Edits show straight away and go to Python as ops:
 //   {opId, kind: "add", goal: {id, title, period, period_start}}
 //   {opId, kind: "toggle", id, done}         {opId, kind: "edit", id, title | notes}
 //   {opId, kind: "repeat", id, repeat}       {opId, kind: "move", id, period}
 //   {opId, kind: "delete", id}               {opId, kind: "reorder", ids}
-//   {opId, kind: "carry", period, start}
 // Like the timetable grid, ops stay pending until Python lists their opId in
-// `acked`, so a slow rerun never shows old data. Other triggers: "nav"
-// {period, dir: -1 | 0 | 1} and "seeAll".
+// `acked`, so a slow rerun never shows old data.
 
-const PERIODS = ["daily", "weekly", "monthly", "yearly"];
-const NAMES = { daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
-const UNITS = { daily: "day", weekly: "week", monthly: "month", yearly: "year" };
-const CURRENT = { daily: "Today", weekly: "This week", monthly: "This month", yearly: "This year" };
+const PERIODS = ["daily", "weekly", "monthly"];
+const NAMES = { daily: "Daily", weekly: "Weekly", monthly: "Monthly" };
+const UNITS = { daily: "day", weekly: "week", monthly: "month" };
 const COMPLETE_MS = 650;          // how long a ticked goal stays in place before moving down
 
 const ICONS = {
   check: '<svg viewBox="0 0 24 24"><path d="M6.5 12.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
-  prev: '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  next: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   chevron: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   repeat: '<svg viewBox="0 0 24 24"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  carry: '<svg viewBox="0 0 24 24"><path d="M4 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   notes: '<svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   move: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3.5 10h17M8 3v4M16 3v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -49,7 +43,7 @@ function recall(key) {
 }
 
 // Period maths on ISO dates (UTC, so there are no daylight-saving surprises).
-// Mirrors store.goal_period_start / shift_period / move_target.
+// Mirrors store.start_of_period / shift_period / move_target.
 const toDate = (iso) => new Date(iso + "T00:00:00Z");
 const toIso = (d) => d.toISOString().slice(0, 10);
 
@@ -57,7 +51,6 @@ function periodStart(period, iso) {
   const d = toDate(iso);
   if (period === "weekly") d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
   else if (period === "monthly") d.setUTCDate(1);
-  else if (period === "yearly") return `${iso.slice(0, 4)}-01-01`;
   return toIso(d);
 }
 
@@ -66,7 +59,6 @@ function shiftPeriod(period, start, n) {
   if (period === "daily") d.setUTCDate(d.getUTCDate() + n);
   else if (period === "weekly") d.setUTCDate(d.getUTCDate() + 7 * n);
   else if (period === "monthly") d.setUTCMonth(d.getUTCMonth() + n);
-  else d.setUTCFullYear(d.getUTCFullYear() + n);
   return toIso(d);
 }
 
@@ -101,7 +93,6 @@ export default function (component) {
     instances.set(root, gl);
   }
   gl.send = (ops) => setTriggerValue("ops", ops);
-  gl.trigger = (name, value) => setTriggerValue(name, { ...value, nonce: uid() });
   gl.update(data);
   return () => gl.detach();
 }
@@ -114,6 +105,7 @@ class GoalLists {
     this.completing = new Map(); // id -> "ticked" | "leaving": just ticked, still shown in place
     this.editing = null;         // {kind: "add", period} | {kind: "title" | "notes", id}, plus value
     this.openDone = new Set(recall("gl-open-done") || []);
+    this.expanded = new Set();   // sections showing all their to-dos, not just the first few
     this.drag = null;
     this.onOutside = (e) => { if (this.menu && !e.composedPath().includes(this.menu)) this.closeMenu(); };
     this.onKey = (e) => { if (e.key === "Escape") this.closeMenu(); };
@@ -210,9 +202,9 @@ class GoalLists {
   // ---------- Drawing ----------
 
   render() {
-    const { compact, sections } = this.data;
+    const { sections } = this.data;
     this.rendering = true;
-    this.root.innerHTML = `<div class="gl-grid${compact ? " compact" : ""}">
+    this.root.innerHTML = `<div class="gl-grid compact">
       ${sections.map((s) => this.sectionHtml(s)).join("")}</div>`;
     this.rendering = false;
     this.restoreEditor();
@@ -221,35 +213,20 @@ class GoalLists {
   sectionHtml(sec) {
     const { all, active, done } = this.split(sec);
     const finished = all.filter((g) => g.done).length;
-    const limit = sec.limit || Infinity;
+    const limit = this.expanded.has(sec.period) ? Infinity : sec.limit || Infinity;
     const shown = active.slice(0, limit);
     const hidden = active.length - shown.length;
     const open = this.openDone.has(sec.period);
-    const compact = this.data.compact;
-
-    const nav = compact ? "" : `
-      <div class="gl-nav">
-        <div class="gl-pill">
-          <button class="gl-icon" data-nav="-1" title="Previous ${UNITS[sec.period]}">${ICONS.prev}</button>
-          <span class="gl-when">${esc(sec.title)}</span>
-          <button class="gl-icon" data-nav="1" title="Next ${UNITS[sec.period]}">${ICONS.next}</button>
-        </div>
-        ${sec.current ? "" : `<button class="gl-chip" data-nav="0">${CURRENT[sec.period]}</button>`}
-        <button class="gl-chip gl-carry" data-carry ${all.some((g) => !g.done) ? "" : "disabled"}
-          title="Copy unticked goals into the next ${UNITS[sec.period]}">${ICONS.carry}Carry over unfinished</button>
-      </div>`;
-
     const adding = this.editing && this.editing.kind === "add" && this.editing.period === sec.period;
     return `<section class="gl-card" data-period="${sec.period}">
       <header class="gl-head">
         ${ring(finished, all.length)}
         <span class="gl-name">${NAMES[sec.period]}</span>
         <span class="gl-count">${finished}/${all.length}</span>
-        ${compact ? `<button class="gl-link" data-see-all>See all</button>` : ""}
+        <span class="gl-sub">${esc(sec.title)}</span>
       </header>
-      ${nav}
       <ul class="gl-list" data-list="${sec.period}">${shown.map((g) => this.rowHtml(g)).join("")}</ul>
-      ${hidden > 0 ? `<button class="gl-link gl-more" data-see-all>${hidden} more</button>` : ""}
+      ${hidden > 0 ? `<button class="gl-link gl-more" data-more>${hidden} more</button>` : ""}
       ${adding ? `<div class="gl-add editing"><span class="gl-tick ghost"></span>
           <input class="gl-input" data-editor placeholder="New goal" aria-label="New goal"></div>`
                : `<button class="gl-add" data-add>${ICONS.plus}<span>New goal</span></button>`}
@@ -346,12 +323,10 @@ class GoalLists {
     if (t.dataset.tick !== undefined) this.toggle(row.dataset.id);
     else if (t.dataset.title !== undefined) this.startEdit({ kind: "title", id: row.dataset.id });
     else if (t.dataset.add !== undefined) this.startEdit({ kind: "add", period });
-    else if (t.dataset.nav !== undefined) this.trigger("nav", { period, dir: Number(t.dataset.nav) });
-    else if (t.dataset.carry !== undefined) {
-      const sec = this.section(period);
-      this.commit([{ opId: uid(), kind: "carry", period, start: sec.start }]);
-    } else if (t.dataset.seeAll !== undefined) this.trigger("seeAll", {});
-    else if (t.dataset.toggleDone !== undefined) {
+    else if (t.dataset.more !== undefined) {
+      this.expanded.add(period);
+      this.render();
+    } else if (t.dataset.toggleDone !== undefined) {
       this.openDone.has(period) ? this.openDone.delete(period) : this.openDone.add(period);
       remember("gl-open-done", [...this.openDone]);
       this.render();

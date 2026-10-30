@@ -1,185 +1,110 @@
-"""
-Goals: period maths, repeating goals, carry over, moves, export/import.
-Uses the throwaway database from the `store` fixture.
-"""
+"""Goals in store.py: measurable monthly/yearly targets, habit-linked progress, CSV, and the to-do migration."""
 
+import sqlite3
 from datetime import date
+from io import StringIO
 
 import pandas as pd
 
 
-def test_period_starts(store):
-    friday = date(2026, 10, 30)
-    assert store.goal_period_start("daily", friday) == friday
-    assert store.goal_period_start("weekly", friday) == date(2026, 10, 26)
-    assert store.goal_period_start("monthly", friday) == date(2026, 10, 1)
-    assert store.goal_period_start("yearly", friday) == date(2026, 1, 1)
-    assert store.goal_period_start("weekly", "2026-11-01") == date(2026, 10, 26)   # Sunday ends the week
-    assert store.goal_period_start("weekly", "2026-11-02") == date(2026, 11, 2)    # Monday starts one
+def tick(store, habit_id, *days):
+    with store.db() as conn:
+        for d in days:
+            store.set_habit_done(conn, habit_id, d, True)
 
 
-def test_week_boundaries_across_month_and_year(store):
-    assert store.goal_period_start("weekly", "2027-01-01") == date(2026, 12, 28)
-    assert store.goal_period_end("weekly", date(2026, 12, 28)) == date(2027, 1, 3)
-    assert store.shift_period("weekly", date(2026, 10, 26), 1) == date(2026, 11, 2)
-    assert store.shift_period("weekly", date(2026, 10, 26), -1) == date(2026, 10, 19)
+def test_manual_progress(store):
+    g = store.add_goal("Read books", "yearly", "2026-03-04", 20, "books")
+    assert (g["period_start"], g["target"], g["value"], g["habit"]) == ("2026-01-01", 20, 0, None)
+    store.add_goal_progress(g["id"], 3)
+    store.add_goal_progress(g["id"], -5)                     # never below 0
+    assert store.get_goal(g["id"])["value"] == 0
+    store.add_goal_progress(g["id"], 2.5)
+    store.set_goal_progress(g["id"], 7)
+    assert store.get_goal(g["id"])["value"] == 7
 
 
-def test_month_and_year_rollover(store):
-    assert store.shift_period("monthly", date(2026, 12, 1), 1) == date(2027, 1, 1)
-    assert store.shift_period("monthly", date(2026, 1, 1), -1) == date(2025, 12, 1)
-    assert store.shift_period("monthly", date(2026, 10, 1), 14) == date(2027, 12, 1)
-    assert store.shift_period("monthly", "2026-10-17", 1) == date(2026, 11, 1)    # any day of the month
-    assert store.goal_period_end("monthly", date(2028, 2, 1)) == date(2028, 2, 29)
-    assert store.shift_period("yearly", date(2026, 1, 1), 1) == date(2027, 1, 1)
-    assert store.goal_period_end("yearly", date(2026, 1, 1)) == date(2026, 12, 31)
-    assert store.shift_period("daily", date(2026, 12, 31), 1) == date(2027, 1, 1)
+def test_habit_linked_progress_counts_ticks_in_the_period(store):
+    store.add_habit("Gym")
+    hid = store.find_habit("gym")[0]
+    g = store.add_goal("Gym", "monthly", "2026-10-15", 12, "sessions", habit_id=hid)
+    tick(store, hid, "2026-09-30", "2026-10-01", "2026-10-02", "2026-10-31", "2026-11-01")
+    got = store.get_goal(g["id"])
+    assert (got["value"], got["habit"]) == (3, "Gym")        # only October's ticks
+    store.set_goal_progress(g["id"], 99)                     # the hand-kept number is ignored while linked
+    assert store.get_goal(g["id"])["value"] == 3
+    store.update_goal(g["id"], habit_id=None)                # unlink: back to the hand-kept number
+    assert store.get_goal(g["id"])["value"] == 99
 
 
-def test_add_tick_order(store):
-    a = store.add_goal("Finish problem sheet", "weekly", "2026-10-30")
-    b = store.add_goal("Go gym", "weekly", "2026-10-28")
-    assert a["period_start"] == b["period_start"] == "2026-10-26"
-    assert [g["title"] for g in store.goals_for("weekly", "2026-11-01")] == ["Finish problem sheet", "Go gym"]
+def test_deleting_the_habit_unlinks_the_goal(store):
+    store.add_habit("Run")
+    hid = store.find_habit("run")[0]
+    g = store.add_goal("Run", "monthly", "2026-10-01", 8, habit_id=hid)
+    store.delete_habit(hid)
+    assert store.get_goal(g["id"])["habit_id"] is None
 
-    store.set_goal_done(a["id"], True)
-    done_at = store.get_goal(a["id"])["done_at"]
-    assert store.get_goal(a["id"])["done"] and done_at
-    store.set_goal_done(a["id"], True)                       # ticking again keeps the first time
-    assert store.get_goal(a["id"])["done_at"] == done_at
-    assert store.goals_progress("weekly", "2026-10-26") == (1, 2)
-    store.set_goal_done(a["id"], False)
-    assert store.get_goal(a["id"])["done_at"] is None
 
+def test_goals_in_order_and_validation(store):
+    a = store.add_goal("A", "monthly", "2026-10-01", 1)
+    b = store.add_goal("B", "monthly", "2026-10-20", 2)
     store.reorder_goals([b["id"], a["id"]])
-    assert [g["title"] for g in store.goals_for("weekly", "2026-10-26")] == ["Go gym", "Finish problem sheet"]
+    assert [g["title"] for g in store.goals_in("monthly", "2026-10-31")] == ["B", "A"]
+    for bad in (("", "monthly", 1), ("X", "weekly", 1), ("X", "monthly", 0)):
+        try:
+            store.add_goal(bad[0], bad[1], "2026-10-01", bad[2])
+            assert False, bad
+        except ValueError:
+            pass
+    store.update_goal(a["id"], title="A2", target=5, unit="km")
+    assert (store.get_goal(a["id"])["title"], store.get_goal(a["id"])["unit"]) == ("A2", "km")
 
 
-def test_add_is_idempotent_by_id(store):
-    store.add_goal("Read", "daily", "2026-10-30", goal_id="g1")
-    store.add_goal("Read", "daily", "2026-10-30", goal_id="g1")
-    assert len(store.goals_for("daily", "2026-10-30")) == 1
-
-
-def test_update_and_delete(store):
-    g = store.add_goal("Read", "daily", "2026-10-30")
-    store.update_goal(g["id"], title="  Read 20 pages ", notes="the novel", repeat=True)
-    got = store.get_goal(g["id"])
-    assert (got["title"], got["notes"], got["repeat"]) == ("Read 20 pages", "the novel", True)
-    store.update_goal(g["id"], notes="  ")
-    assert store.get_goal(g["id"])["notes"] is None
-    store.delete_goal(g["id"])
-    assert store.get_goal(g["id"]) is None
-
-
-def test_move_to_another_period(store):
-    today = date(2026, 10, 30)
-    g = store.add_goal("Plan trip", "daily", today)
-    assert store.move_goal(g["id"], "monthly", today) == "2026-10-01"
-    # Moving from this month back to daily lands on today, not the 1st.
-    assert store.move_goal(g["id"], "daily", today) == "2026-10-30"
-    # A goal from another period keeps its own dates.
-    old = store.add_goal("Old", "weekly", "2026-09-07")
-    assert store.move_goal(old["id"], "daily", today) == "2026-09-07"
-    assert store.move_goal(old["id"], "yearly", today) == "2026-01-01"
-
-
-def test_repeating_goals_roll_over_once(store):
-    store.add_goal("Go gym", "weekly", "2026-10-26", repeat=True)
-    store.add_goal("One-off", "weekly", "2026-10-26")
-    store.add_goal("Stretch", "daily", "2026-10-29", repeat=True)
-    store.set_goal_done(store.goals_for("weekly", "2026-10-26")[0]["id"], True)
-
-    assert store.roll_goals(date(2026, 10, 30)) == 1          # Stretch for today; this week has its own
-    assert [g["title"] for g in store.goals_for("daily", "2026-10-30")] == ["Stretch"]
-
-    assert store.roll_goals(date(2026, 11, 2)) == 2           # a new week and a new day
-    week = store.goals_for("weekly", "2026-11-02")
-    assert [(g["title"], g["done"], g["repeat"]) for g in week] == [("Go gym", False, True)]
-
-    assert store.roll_goals(date(2026, 11, 2)) == 0           # no duplicates
-    store.delete_goal(week[0]["id"])
-    assert store.roll_goals(date(2026, 11, 3)) == 1           # only the new day; the deleted copy stays gone
-    assert store.goals_for("weekly", "2026-11-02") == []
-
-
-def test_roll_skips_titles_already_there_and_repeat_off(store):
-    store.add_goal("Read", "monthly", "2026-10-01", repeat=True)
-    store.add_goal("read", "monthly", "2026-11-01")           # already there (any case)
-    store.add_goal("Tidy", "monthly", "2026-09-01", repeat=True)
-    tidy = store.add_goal("Tidy", "monthly", "2026-10-01")    # latest copy has repeat off
-    assert store.get_goal(tidy["id"])["repeat"] is False
-    assert store.roll_goals(date(2026, 11, 15)) == 0
-    assert [g["title"] for g in store.goals_for("monthly", "2026-11-01")] == ["read"]
-
-
-def test_roll_after_a_gap_and_across_the_year(store):
-    store.add_goal("Annual review", "yearly", "2026-01-01", repeat=True)
-    store.add_goal("Budget", "monthly", "2026-12-01", repeat=True)
-    store.roll_goals(date(2027, 1, 20))
-    assert [g["title"] for g in store.goals_for("yearly", "2027-01-01")] == ["Annual review"]
-    assert [g["title"] for g in store.goals_for("monthly", "2027-01-01")] == ["Budget"]
-
-
-def test_carry_over(store):
-    a = store.add_goal("Essay", "weekly", "2026-10-26", notes="draft 2")
-    store.add_goal("Done thing", "weekly", "2026-10-26")
-    store.add_goal("Laundry", "weekly", "2026-10-26")
-    store.set_goal_done(store.goals_for("weekly", "2026-10-26")[1]["id"], True)
-    store.add_goal("laundry", "weekly", "2026-11-02")         # already in next week
-
-    assert store.carry_over("weekly", "2026-10-30") == 1
-    nxt = store.goals_for("weekly", "2026-11-02")
-    assert [(g["title"], g["notes"], g["done"]) for g in nxt] == [("laundry", None, False), ("Essay", "draft 2", False)]
-    assert store.get_goal(a["id"])["period_start"] == "2026-10-26"   # the original stays
-    assert store.carry_over("weekly", "2026-10-26") == 0             # carrying twice doubles nothing
-
-    store.add_goal("Year end", "monthly", "2026-12-01")
-    assert store.carry_over("monthly", "2026-12-01") == 1
-    assert [g["title"] for g in store.goals_for("monthly", "2027-01-01")] == ["Year end"]
-
-
-def test_export_import_round_trip(store):
-    g = store.add_goal("Run 5k", "monthly", "2026-10-05", notes="park", repeat=True)
-    store.set_goal_done(g["id"], True)
-    store.add_goal("Learn Spanish", "yearly", "2026-03-01")
+def test_goals_csv_round_trip(store):
+    store.add_habit("Gym")
+    hid = store.find_habit("gym")[0]
+    g = store.add_goal("Gym", "monthly", "2026-10-01", 12, "sessions", habit_id=hid)
+    m = store.add_goal("Save", "yearly", "2026-01-01", 1000, "£")
+    store.set_goal_progress(m["id"], 250)
     csv = store.load_goals().to_csv(index=False)
-
-    store.delete_goal(g["id"])
-    from io import StringIO
-    assert store.save_goals(pd.read_csv(StringIO(csv))) == 2
-    got = store.get_goal(g["id"])
-    assert (got["title"], got["notes"], got["period_start"], got["done"], got["repeat"]) == (
-        "Run 5k", "park", "2026-10-01", True, True)
-    assert len(store.load_goals()) == 2                        # merge updated, didn't double
-
-    # Minimal rows: title + period (+ any date in the period); bad rows are skipped.
-    rows = pd.DataFrame({"title": ["Ship it", "", "Bad"], "period": ["Weekly", "daily", "fortnightly"],
-                         "period_start": ["2026-10-29", None, None]})
-    assert store.save_goals(rows, replace=True) == 1
-    assert [(r["title"], r["period_start"]) for r in store.load_goals().to_dict("records")] == [("Ship it", "2026-10-26")]
+    assert store.save_goals(pd.read_csv(StringIO(csv)), replace=True) == 2
+    assert store.get_goal(g["id"])["habit"] == "Gym"         # linked again by habit name
+    assert store.get_goal(m["id"])["value"] == 250
+    rows = pd.DataFrame({"title": ["Swim", "No target", "Bad period"], "period": ["Monthly", "monthly", "weekly"],
+                         "target": [4, None, 3], "habit": ["Nope", None, None]})
+    assert store.save_goals(rows) == 1                        # unknown habit -> updated by hand
+    assert [x["habit"] for x in store.goals_in("monthly", store.london_today()) if x["title"] == "Swim"] == [None]
 
 
-def test_backups_include_goals(store):
-    import sqlite3
-
-    import setup_checks
-    store.add_goal("Go gym", "weekly", "2026-10-30")
-    path = setup_checks.backup_now()
-    with sqlite3.connect(path) as conn:
-        assert conn.execute("SELECT title FROM goals").fetchall() == [("Go gym",)]
-
-
-def test_period_titles(store):
-    today = date(2026, 10, 30)
-    t = lambda p, d: store.period_title(p, date.fromisoformat(d), today)
-    assert t("daily", "2026-10-30") == "Today"
-    assert t("daily", "2026-10-29") == "Yesterday"
-    assert t("daily", "2026-11-04") == "Wed 4 Nov"
-    assert t("daily", "2027-01-04") == "Mon 4 Jan 2027"
-    assert t("weekly", "2026-10-28") == "This week: 26 Oct to 1 Nov"
-    assert t("weekly", "2026-11-02") == "Next week: 2 to 8 Nov"
-    assert t("weekly", "2026-10-12") == "12 to 18 Oct"
-    assert t("weekly", "2026-12-28") == "28 Dec 2026 to 3 Jan 2027"
-    assert t("monthly", "2026-11-09") == "November 2026"
-    assert t("yearly", "2026-11-09") == "2026"
+def test_old_goals_table_becomes_todos(tmp_path, monkeypatch):
+    """A database from before the split: its "goals" were to-dos. They move to todos, yearly ones go."""
+    import importlib
+    data = tmp_path / "old"
+    data.mkdir()
+    db = data / "life.db"
+    with sqlite3.connect(db) as conn:
+        conn.executescript("""
+            CREATE TABLE goals (id TEXT PRIMARY KEY, title TEXT NOT NULL, notes TEXT, period TEXT NOT NULL,
+                period_start TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, done_at TEXT,
+                "repeat" INTEGER NOT NULL DEFAULT 0, ord INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+            CREATE INDEX goals_period ON goals (period, period_start);
+            CREATE TABLE goal_rollover (period TEXT PRIMARY KEY, period_start TEXT NOT NULL);
+            INSERT INTO goals VALUES ('d', 'Gym', NULL, 'daily', '2026-10-30', 1, 'x', 0, 0, 'x'),
+                                     ('m', 'Budget', NULL, 'monthly', '2026-10-01', 0, NULL, 1, 0, 'x'),
+                                     ('y', 'Learn Spanish', NULL, 'yearly', '2026-01-01', 0, NULL, 0, 0, 'x');
+            INSERT INTO goal_rollover VALUES ('monthly', '2026-10-01'), ('yearly', '2026-01-01');
+        """)
+    monkeypatch.setenv("ARETE_DATA_DIR", str(data))
+    monkeypatch.setenv("ARETE_DB", str(db))
+    import store
+    store = importlib.reload(store)
+    store.init_db()
+    store.init_db()                                           # running again changes nothing
+    assert [t["title"] for t in store.todos_for("daily", "2026-10-30")] == ["Gym"]
+    assert [t["title"] for t in store.todos_for("monthly", "2026-10-01")] == ["Budget"]
+    assert store.get_todo("y") is None                        # yearly to-dos are gone
+    assert store.goals_in("yearly", "2026-01-01") == []       # and goals start empty
+    backups = list((data / "backups").glob("life-*-before-todos.db"))
+    assert len(backups) == 1
+    with sqlite3.connect(backups[0]) as conn:                 # the backup has everything as it was
+        assert conn.execute("SELECT COUNT(*) FROM goals").fetchone()[0] == 3

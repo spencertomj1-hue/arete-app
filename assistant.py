@@ -119,15 +119,25 @@ What the app tracks
     into their own block and changes it, delete_block removes it from Arete's timetable (both need the
     user's confirmation), and adding a block over one trims it. None of this ever changes Outlook.
 
-- Goals: to-dos for a day, a week (Monday to Sunday), a month or a year (period "daily", "weekly",
-  "monthly" or "yearly"). A goal belongs to the period containing its date (default today), e.g.
-  "add go gym to this week's goals" -> add_goal(title="Go gym", period="weekly"), and "next month's goals"
-  -> period="monthly" with any date next month. Write titles in sentence case.
-  - "tick off finish problem sheet" -> complete_goal(goal="finish problem sheet"). Goals are found by
-    title in the current day/week/month/year (pass period or date to narrow it down, or the id from
-    list_goals). If several match, ask which one. uncomplete_goal unticks.
-  - repeat=true gives the goal a fresh unticked copy every new period ("every week", "daily habit").
-  - delete_goal needs the user's confirmation.
+- To-dos: tick-off lists for a day, a week (Monday to Sunday) or a month (period "daily", "weekly" or
+  "monthly"), shown on the Home page. A to-do belongs to the period containing its date (default today).
+  Users often call these "goals" ("add go gym to this week's goals", "today's goals"): anything for a
+  day or a week, or anything you tick off, is a to-do.
+  - "add go gym to this week's goals" -> add_todo(title="Go gym", period="weekly"). Sentence-case titles.
+  - "tick off finish problem sheet" -> complete_todo(todo="finish problem sheet"). To-dos are found by
+    title in the current day/week/month (pass period or date to narrow it down, or the id from
+    list_todos). If several match, ask which one. uncomplete_todo unticks.
+  - repeat=true gives the to-do a fresh unticked copy every new period ("every week").
+  - delete_todo needs the user's confirmation.
+
+- Goals: measurable targets for a month or a year (period "monthly" or "yearly"), with a progress bar,
+  e.g. "Gym: 12 sessions this month", "Read 20 books this year". Each has a target and an optional unit.
+  - Progress is either updated by hand (log_goal_progress adds, e.g. "did 2 more gym sessions";
+    set_goal_progress sets it), or counted automatically from a habit (habit="Gym": the number of days
+    that habit was ticked in the period). For a habit-linked goal, tick the habit with set_habit instead.
+  - "set a goal of 12 gym sessions this month" -> add_goal(title="Gym", target=12, unit="sessions").
+    If a habit with a matching name exists, ask whether to count that habit or update it by hand.
+  - edit_goal changes the title, target, unit or linked habit; delete_goal needs the user's confirmation.
 
 {tools.list_categories().text}
 
@@ -151,15 +161,18 @@ Style
 DATE = {"type": "string", "description": "YYYY-MM-DD"}
 TIME = {"type": "string", "description": "HH:mm on the hour or half hour, 07:00-01:00"}
 TRACK = {"type": "string", "enum": ["plan", "actual"]}
-PERIOD = {"type": "string", "enum": ["daily", "weekly", "monthly", "yearly"]}
 
 
 def _schema(required, **props):
     return {"type": "object", "properties": props, "required": list(required)}
 
 
-GOAL_REF = _schema(["goal"], goal={"type": "string", "description": "the goal's title (or part of it), or its id"},
-                   period=PERIOD, date={**DATE, "description": "a day in the goal's period, if not the current one"})
+TODO_PERIOD = {"type": "string", "enum": ["daily", "weekly", "monthly"]}
+GOAL_PERIOD = {"type": "string", "enum": ["monthly", "yearly"]}
+TODO_REF = _schema(["todo"], todo={"type": "string", "description": "the to-do's title (or part of it), or its id"},
+                   period=TODO_PERIOD, date={**DATE, "description": "a day in the to-do's period, if not the current one"})
+GOAL_REF = {"goal": {"type": "string", "description": "the goal's title (or part of it), or its id"},
+            "period": GOAL_PERIOD, "date": {**DATE, "description": "a day in the goal's month/year, if not the current one"}}
 
 TOOL_SPECS = [
     ("log_day", "Set mood/sleep/energy/notes for a date. Fields not given are left as they are.",
@@ -205,18 +218,35 @@ TOOL_SPECS = [
      tools.edit_category),
     ("set_outlook_category", "Set which category (and so colour) Outlook calendar events use.",
      _schema(["category"], category={"type": "string"}), tools.set_outlook_category),
-    ("add_goal", "Add a goal (to-do) to a day, week, month or year: the period containing `date` (default today).",
-     _schema(["title", "period"], title={"type": "string"}, period=PERIOD,
+    ("add_todo", "Add a to-do to a day, week or month: the period containing `date` (default today).",
+     _schema(["title", "period"], title={"type": "string"}, period=TODO_PERIOD,
              date={**DATE, "description": "YYYY-MM-DD, any day in the period (default today)"},
              repeat={"type": "boolean", "description": "a fresh copy every new period"},
              notes={"type": "string", "description": "optional short note shown under the title"}),
+     tools.add_todo),
+    ("complete_todo", "Tick off a to-do, found by title (or id) in the current periods.", TODO_REF, tools.complete_todo),
+    ("uncomplete_todo", "Untick a to-do, found by title (or id) in the current periods.", TODO_REF,
+     tools.uncomplete_todo),
+    ("list_todos", "List to-dos (with ids) for the periods containing a date (default today).",
+     _schema([], period=TODO_PERIOD, date=DATE), tools.list_todos),
+    ("delete_todo", "Delete a to-do, found by title (or id) in the current periods.", TODO_REF, tools.delete_todo),
+    ("add_goal", "Add a measurable goal for a month or year, e.g. 12 gym sessions. Link a habit to count it automatically.",
+     _schema(["title", "target"], title={"type": "string"}, target={"type": "number"}, period=GOAL_PERIOD,
+             unit={"type": "string", "description": "e.g. 'sessions', 'km', 'books' (optional)"},
+             habit={"type": "string", "description": "a habit whose ticks count as progress (optional)"},
+             date={**DATE, "description": "any day in the month/year (default today)"}),
      tools.add_goal),
-    ("complete_goal", "Tick off a goal, found by title (or id) in the current periods.", GOAL_REF, tools.complete_goal),
-    ("uncomplete_goal", "Untick a goal, found by title (or id) in the current periods.", GOAL_REF,
-     tools.uncomplete_goal),
-    ("list_goals", "List goals (with ids and progress) for the periods containing a date (default today).",
-     _schema([], period=PERIOD, date=DATE), tools.list_goals),
-    ("delete_goal", "Delete a goal, found by title (or id) in the current periods.", GOAL_REF, tools.delete_goal),
+    ("log_goal_progress", "Add to a goal's progress (amount defaults to 1; negative takes some off).",
+     _schema(["goal"], **GOAL_REF, amount={"type": "number"}), tools.log_goal_progress),
+    ("set_goal_progress", "Set a goal's progress to an exact number.",
+     _schema(["goal", "value"], **GOAL_REF, value={"type": "number"}), tools.set_goal_progress),
+    ("edit_goal", "Change a goal's title, target, unit, or linked habit (unlink_habit=true to update it by hand).",
+     _schema(["goal"], **GOAL_REF, title={"type": "string"}, target={"type": "number"}, unit={"type": "string"},
+             habit={"type": "string"}, unlink_habit={"type": "boolean"}),
+     tools.edit_goal),
+    ("list_goals", "List goals with progress and ids for the month and year containing a date (default today).",
+     _schema([], period=GOAL_PERIOD, date=DATE), tools.list_goals),
+    ("delete_goal", "Delete a goal, found by title (or id).", _schema(["goal"], **GOAL_REF), tools.delete_goal),
     ("set_activity_default", "Set which category an activity label (e.g. 'Lecture') uses by default.",
      _schema(["label", "category"], label={"type": "string"}, category={"type": "string"}),
      tools.set_activity_default),

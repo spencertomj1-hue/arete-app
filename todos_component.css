@@ -1,4 +1,4 @@
-/* Goal lists — Apple Reminders-style rows using the app's font and theme. */
+/* To-do lists — Apple Reminders-style rows using the app's font and theme. */
 
 .gl-root {
   --text: var(--st-text-color, #31333f);
@@ -17,17 +17,15 @@ button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 svg { display: block; }
 
-/* ---------- Layout: Goals page 2 columns, Home 3 cards; one column when narrow ---------- */
+/* ---------- Layout: 3 cards side by side; one column when narrow ---------- */
 
 .gl-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
   align-items: start;
 }
-.gl-grid.compact { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-@container (max-width: 720px) { .gl-grid:not(.compact) { grid-template-columns: minmax(0, 1fr); } }
-@container (max-width: 560px) { .gl-grid.compact { grid-template-columns: minmax(0, 1fr); } }
+@container (max-width: 560px) { .gl-grid { grid-template-columns: minmax(0, 1fr); } }
 
 .gl-card {
   padding: 14px 14px 10px;
@@ -44,6 +42,15 @@ svg { display: block; }
 .gl-name { font-size: 1.15rem; font-weight: 650; letter-spacing: -0.01em; }
 .compact .gl-name { font-size: 0.98rem; }
 .gl-count { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.9em; }
+.gl-sub {
+  margin-left: auto;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .gl-ring { width: 18px; height: 18px; flex: none; transform: rotate(-90deg); }
 .gl-ring circle { fill: none; stroke-width: 2.6; }
@@ -59,38 +66,8 @@ svg { display: block; }
   font-size: 0.82rem;
   font-weight: 500;
 }
-.gl-head .gl-link { margin-left: auto; }
 .gl-link:hover { text-decoration: underline; }
 .gl-more { display: block; margin: 2px 0 0 26px; }
-
-/* ---------- Period navigation (Goals page) ---------- */
-
-.gl-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
-.gl-pill {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid rgba(128, 128, 128, 0.35);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.gl-when { padding: 0 6px; font-size: 0.8rem; white-space: nowrap; }
-.gl-icon { border: none; background: transparent; padding: 3px 7px; display: inline-flex; }
-.gl-icon svg { width: 15px; height: 15px; }
-.gl-icon:hover { background: rgba(128, 128, 128, 0.1); }
-.gl-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border: 1px solid rgba(128, 128, 128, 0.35);
-  border-radius: 999px;
-  background: transparent;
-  font-size: 0.78rem;
-}
-.gl-chip svg { width: 13px; height: 13px; }
-.gl-chip:hover:not(:disabled) { background: rgba(128, 128, 128, 0.1); }
-.gl-chip:disabled { opacity: 0.4; cursor: default; }
-.gl-carry { margin-left: auto; }
 
 /* ---------- Rows ---------- */
 
