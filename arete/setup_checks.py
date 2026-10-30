@@ -44,25 +44,28 @@ save_settings = store.save_settings
 
 def claude_status():
     """
-    {found, path, logged_in, account, note}. Uses `claude auth status`, which
-    doesn't spend any tokens. An ANTHROPIC_API_KEY counts as logged in.
+    {found, path, bundled, logged_in, account, note}. `found` means the user has
+    Claude Code installed (`bundled`: only the SDK's own copy is available).
+    An API key (saved in Settings, or $ANTHROPIC_API_KEY) counts as logged in.
+    Otherwise it asks `claude auth status`, which doesn't spend any tokens.
     """
     path = assistant.find_claude()
-    if not path:
-        return {"found": False, "path": None, "logged_in": False, "account": None,
-                "note": "Claude Code isn't installed (or Arete can't find it)."}
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return {"found": True, "path": path, "logged_in": True, "account": "API key",
-                "note": "Using the ANTHROPIC_API_KEY from your environment."}
+    bundled = bool(path) and path == assistant.bundled_claude()
+    if assistant.api_key() and path:
+        return {"found": not bundled, "path": path, "bundled": bundled, "logged_in": True, "account": "API key",
+                "note": None}
+    if not path or bundled:
+        return {"found": False, "path": path, "bundled": bundled, "logged_in": False, "account": None,
+                "note": "Claude isn't set up yet."}
     try:
         out = subprocess.run([path, "auth", "status", "--json"], capture_output=True, text=True, timeout=20,
                              env={**os.environ, **assistant._env(path)})
         info = json.loads(out.stdout or "{}")
     except (OSError, subprocess.TimeoutExpired, ValueError) as e:
-        return {"found": True, "path": path, "logged_in": False, "account": None,
+        return {"found": True, "path": path, "bundled": False, "logged_in": False, "account": None,
                 "note": f"Couldn't check the login ({type(e).__name__})."}
     logged_in = bool(info.get("loggedIn"))
-    return {"found": True, "path": path, "logged_in": logged_in,
+    return {"found": True, "path": path, "bundled": False, "logged_in": logged_in,
             "account": info.get("email") if logged_in else None,
             "note": None if logged_in else "Claude Code is installed but not logged in."}
 
