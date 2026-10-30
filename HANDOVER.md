@@ -34,6 +34,8 @@ store.py                     ALL SQL; timetable painting rules; settings.json; s
 timetable.py                 Timetable page and the week/day grid component's Python side
 timetable_component.js/.css  The grid (Streamlit components v2, shadow root)
 daily_log.py                 Daily log page (month calendar + day card + entry form) and Habits page
+goals.py                     Goals page and Home's goal cards: the goal list component's Python side
+goals_component.js/.css      The Reminders-style goal lists (one component: 4 sections, or 3 compact cards)
 calendar_component.js/.css   The month calendar component
 tools.py                     What Claude can do: plain functions over store.py, previews for destructive changes
 assistant.py                 Claude via claude-agent-sdk: finds the CLI, system prompt, in-process "arete" MCP server
@@ -61,6 +63,8 @@ tests/                       pytest + AppTest; tests/fixtures/sample.ics is a fa
 | `tt_entries` | The user's timetable blocks: `id`, `date`, `track` (plan/actual), `start`/`"end"` ("HH:mm", end exclusive, may be "01:00"), `label`, `category_id`, `details` |
 | `tt_outlook` | Imported Outlook events, **fully replaced on every sync**: `uid`, `date`, `start`/`"end"` (snapped; NULL if all-day), `title`, `location`, `all_day`, `exact` (real times), `description` |
 | `tt_outlook_hidden` | Outlook occurrences the user removed or detached (kept across syncs) |
+| `goals` | `id`, `title`, `notes`, `period` (daily/weekly/monthly/yearly), `period_start` (the day, its Monday, the 1st or 1 Jan), `done`, `done_at`, `"repeat"`, `ord`, `created_at` |
+| `goal_rollover` | Per period kind, the last period repeating goals were copied into (see §5b) |
 
 Notes on the schema:
 - **New installs** are seeded with generic categories (groups "Life" and "Work") and activity defaults, in `DEFAULT_CATEGORIES` / `DEFAULT_LABEL_MAP`. Groups are read from the data (`store.groups()`), so a user's own groups work too.
@@ -81,6 +85,17 @@ Notes on the schema:
 - **Views:** `render_page` is the week (editable). `render_today` is Home's single day: view only, with rows sized to fit the window (`fitToWindow`) and the key wrapped underneath.
 - **Clicking a block** grows it and opens a details card (title, time, category, location, description), with Edit and Delete/Remove buttons except on Home. A drag paints, and a click with the eraser erases.
 - **Block text** is black unless the fill is dark (`contrastText`, luminance threshold 90).
+
+## 5b. Goals
+
+- **Periods:** all period maths is in `store.py` (`goal_period_start`, `shift_period`, `goal_period_end`, `period_title`), on Europe/London dates (`london_today()`). Weeks run Monday to Sunday, like the timetable. The JS has a copy of the maths only to place a moved goal instantly.
+- **Repeats:** `roll_goals()` runs whenever the Goals page, Home or a goal tool loads. Once per period (remembered in `goal_rollover`), each title whose latest earlier copy has repeat on gets an unticked copy, unless the title is already there. A copy the user deletes therefore stays deleted, and turning repeat off on the latest copy stops it.
+- **Carry over:** `carry_over(period, start)` copies unticked goals into the next period, skipping titles already there. The originals stay.
+- **Component:** one `arete_goals` component draws all the lists: the Goals page (key `goals_page`: 4 sections with ‹ › and "Carry over unfinished") or Home (key `home_goals`: 3 compact cards, 6 goals each, then "N more"). A container query stacks the cards when the column is narrow.
+- **Protocol:** the same as the timetable grid. The ops are `add`, `toggle`, `edit`, `repeat`, `move`, `delete`, `reorder` and `carry`, each with an `opId`. `goals.apply_op` saves them, and they're acknowledged in `data.acked` (`goal_acked` in session state). An `add` carries the new goal's id, so a resent op adds nothing. Other triggers: `nav` `{period, dir}` (each section's period is in `goals_start_<period>`) and `seeAll`.
+- **Tick animation:** a ticked goal stays in place for 650 ms (circle fills, title fades and strikes through), then folds into "Completed (n)", which is collapsed by default. Which sections are open is kept in sessionStorage.
+- **Editors:** the new-goal, title and notes boxes are redrawn with their text, caret and focus after every rerun (`restoreEditor`), so typing is never lost.
+- **Home placement:** on Home the chat is an inline box, so the cards sit directly under it in the right column.
 
 ## 6. Outlook import (`outlook.py`)
 
@@ -113,6 +128,7 @@ Notes on the schema:
   - `log_day`, `set_habit`, `add_habit`, `list_habits`
   - `add_block`, `update_block`, `delete_block`, `query_blocks`, `query_entries`, `get_stats`
   - `list_categories`, `edit_category`, `set_activity_default`, `set_outlook_category`
+  - `add_goal`, `complete_goal`, `uncomplete_goal`, `list_goals`, `delete_goal` (confirm first). Goals are found by id or title in the current periods: exact title, then part of a title, then the most shared words ("finish problem sheet" → "Problem sheet 4"). Several matches is an error that lists them, so Claude asks.
 - **Confirm-first:** anything that deletes data or overwrites/trims other data returns `Result(pending=Pending(summary, run))`. The UI shows Confirm/Cancel, and `run()` re-runs the tool with `confirmed=True` against current data.
 - **Chat UI:** the bar is fixed to the bottom of the main column on every page except Home, where it's an inline box with the latest reply under it and the full history in a pop-up.
 - **Flow:** callbacks set `chat_busy`. `chat.render()` draws first, does the slow work (transcribe, then Claude) and then calls `st.rerun()`, so changes show immediately.
@@ -126,6 +142,7 @@ Notes on the schema:
 
 ## 9. Gotchas
 
+- **The sidebar radio has `key="page"`.** Home's "See all" sets it from a component callback, which runs before the radio is drawn; don't set it anywhere after that.
 - **NaN breaks components.** pandas turns SQL NULLs into NaN, which is invalid JSON. `store._read()` converts them to `None`; do the same for anything passed in a component's `data`.
 - **`@font-face` doesn't work inside a component's shadow root.** Document-level fonts (like Streamlit's Material Symbols) do apply.
 - **Fixed positioning:** the chat bar is `position: fixed` inside a component. That works because Streamlit's containers have no `transform`; a future Streamlit version could break it.
@@ -136,7 +153,7 @@ Notes on the schema:
 
 ## 10. Ideas for later
 
-- Timetable data in CSV export/import.
+- Timetable data in CSV export/import (goals have their own CSV).
 - Streaming chat replies.
 - Configurable grid hours (currently fixed at 07:00–01:00).
 - Signing and notarising Arete.app.
