@@ -196,3 +196,78 @@ def test_edit_category_and_activity_default(tools, store):
     assert store.resolve_category(label="scales") == "piano"
     tools.add_block("2026-10-29", "plan", "18:00", "19:00", "Scales")
     assert store.blocks_between("2026-10-29", "2026-10-29")[0]["category_id"] == "piano"
+
+
+# --- goals ---
+
+@pytest.fixture
+def friday(store, monkeypatch):
+    """Pin "today" (Europe/London) to Friday 30 Oct 2026."""
+    monkeypatch.setattr(store, "london_today", lambda: date(2026, 10, 30))
+
+
+def test_add_goal_to_this_week(tools, store, friday):
+    r = tools.add_goal("Go gym", "weekly")
+    assert r.changed and r.text == "Added 'Go gym' to this week's goals (26 Oct to 1 Nov)."
+    assert [g["title"] for g in store.goals_for("weekly", "2026-10-26")] == ["Go gym"]
+    again = tools.add_goal("go gym", "week")
+    assert not again.changed and "already" in again.text
+    r = tools.add_goal("Budget", "monthly", date="2026-11-12", repeat=True, notes="bills")
+    assert "the November 2026 goals" in r.text and "repeating every month" in r.text
+    assert store.goals_for("monthly", "2026-11-01")[0]["repeat"] is True
+    with pytest.raises(tools.ToolError):
+        tools.add_goal("x", "fortnightly")
+
+
+def test_complete_and_uncomplete_by_title(tools, store, friday):
+    store.add_goal("Finish problem sheet", "daily", "2026-10-30")
+    store.add_goal("Read", "weekly", "2026-10-30")
+    r = tools.complete_goal("finish problem sheet")
+    assert r.changed and r.text == "Ticked off 'Finish problem sheet' in today's goals (1/1 done)."
+    assert store.goals_for("daily", "2026-10-30")[0]["done"]
+    assert "already" in tools.complete_goal("problem sheet").text      # partial titles work too
+    assert tools.uncomplete_goal("Finish problem sheet").changed
+    assert not store.goals_for("daily", "2026-10-30")[0]["done"]
+
+
+def test_find_goal_ambiguous_missing_and_by_period(tools, store, friday):
+    store.add_goal("Read", "daily", "2026-10-30")
+    store.add_goal("Read", "weekly", "2026-10-30")
+    store.add_goal("Old", "daily", "2026-10-01")
+    with pytest.raises(tools.ToolError, match="More than one"):
+        tools.complete_goal("read")
+    assert "this week's" in tools.complete_goal("read", period="weekly").text
+    with pytest.raises(tools.ToolError, match="no goal"):
+        tools.complete_goal("old")                                    # not in the current periods
+    assert tools.complete_goal("old", date="2026-10-01").changed
+    gid = store.goals_for("daily", "2026-10-30")[0]["id"]
+    assert tools.complete_goal(gid).changed                           # by id
+
+
+def test_delete_goal_needs_confirm(tools, store, friday):
+    store.add_goal("Tidy desk", "daily", "2026-10-30")
+    r = tools.delete_goal("tidy desk")
+    assert r.pending and r.pending.summary == "Delete the goal 'Tidy desk' in today's goals"
+    assert store.goals_for("daily", "2026-10-30")
+    assert r.pending.run().changed
+    assert store.goals_for("daily", "2026-10-30") == []
+
+
+def test_list_goals(tools, store, friday):
+    g = store.add_goal("Go gym", "weekly", "2026-10-30", repeat=True, notes="3 times")
+    store.set_goal_done(g["id"], True)
+    store.add_goal("Essay", "weekly", "2026-10-30")
+    text = tools.list_goals(period="weekly").text
+    assert text.splitlines() == [
+        "This week's goals (26 Oct to 1 Nov): 1/2 done",
+        f"- [x] Go gym (id {g['id']}; repeats; notes: 3 times)",
+        f"- [ ] Essay (id {store.goals_for('weekly', '2026-10-26')[1]['id']})",
+    ]
+    everything = tools.list_goals().text
+    assert "Today's goals: 0/0 done" in everything and "The 2026 goals: 0/0 done" in everything
+
+
+def test_goal_tools_roll_repeats_first(tools, store, friday):
+    store.add_goal("Stretch", "daily", "2026-10-29", repeat=True)
+    assert "Stretch" in tools.list_goals(period="daily").text
+    assert tools.complete_goal("stretch").changed

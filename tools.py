@@ -444,3 +444,123 @@ def query_blocks(start_date, end_date, track=None):
                 lines.append(f"- id {OUTLOOK_PREFIX}{ev['uid']}: {nice_day(ev['date'])} ({ev['date']}) plan "
                              f"{ev['start']}–{ev['end']} (exactly {ev['exact']}) {ev['title']} (from Outlook){where}")
     return Result("\n".join(lines) or f"No timetable blocks between {first} and {last}.")
+
+
+# ---------------------------------------------------------------------------
+# Goals
+# ---------------------------------------------------------------------------
+
+PERIOD_NAMES = {"daily": "day", "weekly": "week", "monthly": "month", "yearly": "year"}
+
+
+def _period(value):
+    v = str(value).strip().lower()
+    v = {"day": "daily", "today": "daily", "week": "weekly", "month": "monthly", "year": "yearly"}.get(v, v)
+    if v not in store.GOAL_PERIODS:
+        raise ToolError("period must be 'daily', 'weekly', 'monthly' or 'yearly'.")
+    return v
+
+
+def _goal_day(value):
+    return date.fromisoformat(_day(value)) if value else store.london_today()
+
+
+def goal_list_name(period, start):
+    """"this week's goals (26 Oct to 1 Nov)", "today's goals", "the November 2026 goals"."""
+    title = store.period_title(period, start)
+    named = {"Today": "today's", "Yesterday": "yesterday's", "Tomorrow": "tomorrow's"}.get(title)
+    if named:
+        return f"{named} goals"
+    if ": " in title:
+        when, span = title.split(": ")
+        return f"{when.lower()}'s goals ({span})"
+    return f"the {title} goals"
+
+
+def describe_goal(g):
+    return f"'{g['title']}' in {goal_list_name(g['period'], g['period_start'])}"
+
+
+def add_goal(title, period, date=None, repeat=False, notes=None):
+    """Add a goal to the period containing `date` (default today)."""
+    title, per = str(title).strip(), _period(period)
+    if not title:
+        raise ToolError("The goal needs a title.")
+    day = _goal_day(date)
+    store.roll_goals()
+    start = store.goal_period_start(per, day)
+    if any(g["title"].lower() == title.lower() for g in store.goals_for(per, start)):
+        return Result(f"'{title}' is already in {goal_list_name(per, start)}.")
+    g = store.add_goal(title, per, day, notes=notes, repeat=bool(repeat))
+    extra = f", repeating every {PERIOD_NAMES[per]}" if repeat else ""
+    return Result(f"Added '{g['title']}' to {goal_list_name(per, start)}{extra}.", changed=True)
+
+
+def _current_goals(day, period=None):
+    """Goals in the periods containing `day` (all four kinds, or just one)."""
+    periods = [period] if period else store.GOAL_PERIODS
+    return [g for p in periods for g in store.goals_for(p, store.goal_period_start(p, day))]
+
+
+def _find_goal(goal, period=None, date=None):
+    """A goal by id, or by title (exact, then partial) in the periods containing `date` (default today)."""
+    store.roll_goals()
+    found = store.get_goal(str(goal).strip())
+    if found:
+        return found
+    per = _period(period) if period else None
+    pool = _current_goals(_goal_day(date), per)
+    want = str(goal).strip().lower()
+    matches = [g for g in pool if g["title"].lower() == want] or [g for g in pool if want in g["title"].lower()]
+    if len(matches) == 1:
+        return matches[0]
+    if matches:
+        options = "; ".join(f"id {g['id']}: {describe_goal(g)}" for g in matches)
+        raise ToolError(f"More than one goal matches '{goal}': {options}. Ask the user which one, or pass its id.")
+    raise ToolError(f"There's no goal matching '{goal}' in the current periods. "
+                    "Use list_goals (with a date for other periods) to find it.")
+
+
+def complete_goal(goal, period=None, date=None):
+    g = _find_goal(goal, period, date)
+    if g["done"]:
+        return Result(f"{describe_goal(g)} is already ticked off.")
+    store.set_goal_done(g["id"], True)
+    done, total = store.goals_progress(g["period"], g["period_start"])
+    return Result(f"Ticked off {describe_goal(g)} ({done}/{total} done).", changed=True)
+
+
+def uncomplete_goal(goal, period=None, date=None):
+    g = _find_goal(goal, period, date)
+    if not g["done"]:
+        return Result(f"{describe_goal(g)} isn't ticked.")
+    store.set_goal_done(g["id"], False)
+    return Result(f"Unticked {describe_goal(g)}.", changed=True)
+
+
+def delete_goal(goal, period=None, date=None, confirmed=False):
+    g = _find_goal(goal, period, date)
+    summary = f"Delete the goal {describe_goal(g)}"
+    if not confirmed:
+        return Result("", pending=Pending(summary, lambda: delete_goal(g["id"], confirmed=True)))
+    store.delete_goal(g["id"])
+    return Result(f"Done: {summary}.", changed=True)
+
+
+def list_goals(period=None, date=None):
+    """Goals (with ids) in the periods containing `date` (default today)."""
+    store.roll_goals()
+    day = _goal_day(date)
+    sections = []
+    for per in ([_period(period)] if period else store.GOAL_PERIODS):
+        start = store.goal_period_start(per, day)
+        goals = store.goals_for(per, start)
+        done = sum(g["done"] for g in goals)
+        name = goal_list_name(per, start)
+        lines = [f"{name[0].upper()}{name[1:]}: {done}/{len(goals)} done"]
+        for g in goals:
+            extras = [x for x in ("repeats" if g["repeat"] else None, f"notes: {g['notes']}" if g["notes"] else None) if x]
+            lines.append(f"- [{'x' if g['done'] else ' '}] {g['title']} (id {g['id']}"
+                         + "".join(f"; {x}" for x in extras) + ")")
+        sections.append("\n".join(lines))
+    return Result("\n\n".join(sections))

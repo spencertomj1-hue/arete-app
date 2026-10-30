@@ -168,3 +168,18 @@ def test_backups_include_goals(store):
     path = setup_checks.backup_now()
     with sqlite3.connect(path) as conn:
         assert conn.execute("SELECT title FROM goals").fetchall() == [("Go gym",)]
+
+
+def test_period_titles(store):
+    today = date(2026, 10, 30)
+    t = lambda p, d: store.period_title(p, date.fromisoformat(d), today)
+    assert t("daily", "2026-10-30") == "Today"
+    assert t("daily", "2026-10-29") == "Yesterday"
+    assert t("daily", "2026-11-04") == "Wed 4 Nov"
+    assert t("daily", "2027-01-04") == "Mon 4 Jan 2027"
+    assert t("weekly", "2026-10-28") == "This week: 26 Oct to 1 Nov"
+    assert t("weekly", "2026-11-02") == "Next week: 2 to 8 Nov"
+    assert t("weekly", "2026-10-12") == "12 to 18 Oct"
+    assert t("weekly", "2026-12-28") == "28 Dec 2026 to 3 Jan 2027"
+    assert t("monthly", "2026-11-09") == "November 2026"
+    assert t("yearly", "2026-11-09") == "2026"

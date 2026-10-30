@@ -119,6 +119,16 @@ What the app tracks
     into their own block and changes it, delete_block removes it from Arete's timetable (both need the
     user's confirmation), and adding a block over one trims it. None of this ever changes Outlook.
 
+- Goals: to-dos for a day, a week (Monday to Sunday), a month or a year (period "daily", "weekly",
+  "monthly" or "yearly"). A goal belongs to the period containing its date (default today), e.g.
+  "add go gym to this week's goals" -> add_goal(title="Go gym", period="weekly"), and "next month's goals"
+  -> period="monthly" with any date next month. Write titles in sentence case.
+  - "tick off finish problem sheet" -> complete_goal(goal="finish problem sheet"). Goals are found by
+    title in the current day/week/month/year (pass period or date to narrow it down, or the id from
+    list_goals). If several match, ask which one. uncomplete_goal unticks.
+  - repeat=true gives the goal a fresh unticked copy every new period ("every week", "daily habit").
+  - delete_goal needs the user's confirmation.
+
 {tools.list_categories().text}
 
 Confirmations
@@ -141,11 +151,15 @@ Style
 DATE = {"type": "string", "description": "YYYY-MM-DD"}
 TIME = {"type": "string", "description": "HH:mm on the hour or half hour, 07:00-01:00"}
 TRACK = {"type": "string", "enum": ["plan", "actual"]}
+PERIOD = {"type": "string", "enum": ["daily", "weekly", "monthly", "yearly"]}
 
 
 def _schema(required, **props):
     return {"type": "object", "properties": props, "required": list(required)}
 
+
+GOAL_REF = _schema(["goal"], goal={"type": "string", "description": "the goal's title (or part of it), or its id"},
+                   period=PERIOD, date={**DATE, "description": "a day in the goal's period, if not the current one"})
 
 TOOL_SPECS = [
     ("log_day", "Set mood/sleep/energy/notes for a date. Fields not given are left as they are.",
@@ -191,6 +205,18 @@ TOOL_SPECS = [
      tools.edit_category),
     ("set_outlook_category", "Set which category (and so colour) Outlook calendar events use.",
      _schema(["category"], category={"type": "string"}), tools.set_outlook_category),
+    ("add_goal", "Add a goal (to-do) to a day, week, month or year: the period containing `date` (default today).",
+     _schema(["title", "period"], title={"type": "string"}, period=PERIOD,
+             date={**DATE, "description": "YYYY-MM-DD, any day in the period (default today)"},
+             repeat={"type": "boolean", "description": "a fresh copy every new period"},
+             notes={"type": "string", "description": "optional short note shown under the title"}),
+     tools.add_goal),
+    ("complete_goal", "Tick off a goal, found by title (or id) in the current periods.", GOAL_REF, tools.complete_goal),
+    ("uncomplete_goal", "Untick a goal, found by title (or id) in the current periods.", GOAL_REF,
+     tools.uncomplete_goal),
+    ("list_goals", "List goals (with ids and progress) for the periods containing a date (default today).",
+     _schema([], period=PERIOD, date=DATE), tools.list_goals),
+    ("delete_goal", "Delete a goal, found by title (or id) in the current periods.", GOAL_REF, tools.delete_goal),
     ("set_activity_default", "Set which category an activity label (e.g. 'Lecture') uses by default.",
      _schema(["label", "category"], label={"type": "string"}, category={"type": "string"}),
      tools.set_activity_default),

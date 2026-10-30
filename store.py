@@ -806,6 +806,33 @@ def _goal(row):
     return g
 
 
+def _short(d, year=False):
+    return f"{d.day} {d:%b}" + (f" {d.year}" if year else "")
+
+
+def period_title(period, start, today=None):
+    """
+    A period's name relative to today: "Today", "Fri 30 Oct", "This week: 26 Oct to 1 Nov",
+    "Last week: ...", "19 to 25 Oct", "November 2026", "2026".
+    """
+    today = today or london_today()
+    start = goal_period_start(period, start)
+    if period == "daily":
+        named = {0: "Today", -1: "Yesterday", 1: "Tomorrow"}.get((start - today).days)
+        return named or f"{start:%a} {start.day} {start:%b}" + (f" {start.year}" if start.year != today.year else "")
+    if period == "weekly":
+        end = goal_period_end(period, start)
+        other_year = end.year != today.year
+        span = (f"{start.day} to {_short(end, other_year)}" if start.month == end.month
+                else f"{_short(start, start.year != end.year)} to {_short(end, other_year)}")
+        weeks = (start - goal_period_start("weekly", today)).days // 7
+        named = {0: "This week", -1: "Last week", 1: "Next week"}.get(weeks)
+        return f"{named}: {span}" if named else span
+    if period == "monthly":
+        return f"{start:%B %Y}"
+    return str(start.year)
+
+
 def goals_for(period, start):
     """The goals of one period, in list order."""
     start = goal_period_start(period, start).isoformat()
