@@ -6,6 +6,10 @@
 
 <p align="center">
   Track everything, in one place, modifiable to your will.
+</p>
+
+<p align="center">
+  Track everything, in one place, modifiable to your will.
   A personal life tracker for your Mac or Windows PC: a weekly Plan-vs-Actual timetable, a daily log
   of mood, sleep and energy, habits with streaks, to-dos and goals, a map of the people you know, and a Claude chat box that updates it all for you.
 </p>
