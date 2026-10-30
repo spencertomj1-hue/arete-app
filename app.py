@@ -17,6 +17,7 @@ import chat
 import daily_log
 import goals
 import todos
+import network
 import settings_ui
 import store
 import timetable
@@ -193,6 +194,10 @@ st.html(f"""<style>
 </style>""")
 
 
+import sidebar_theme          # the marble sidebar and its boxed menu
+sidebar_theme.apply()
+
+
 def ready_marker():
     """Tells the desktop launcher the page has finished drawing (it then swaps the splash for the app)."""
     st.html('<div id="arete-ready" style="display:none"></div>')
@@ -212,6 +217,7 @@ PAGES = {
     goals.PAGE: goals.render_page,
     daily_log.PAGE: daily_log.page_daily_log,
     "Stats": page_stats,
+    network.PAGE: network.render_page,
     "Settings": settings_ui.page_settings,
 }
 

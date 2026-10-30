@@ -7,14 +7,14 @@
 <p align="center">
   Track everything, in one place, modifiable to your will.
   A personal life tracker for your Mac: a weekly Plan-vs-Actual timetable, a daily log
-  of mood, sleep and energy, habits with streaks, to-dos and goals, and a Claude chat box that updates it all for you.
+  of mood, sleep and energy, habits with streaks, to-dos and goals, a map of the people you know, and a Claude chat box that updates it all for you.
 </p>
 
 <p align="center"><em>No summit, just the climb.</em></p>
 
-> **Alpha (v0.1.0-alpha).** Arete works day to day, but it's early: expect rough edges and changes
-> between versions, and keep backups (Settings → Data → Back up now). Bug reports and ideas are
-> welcome in [Issues](https://github.com/spencertomj1-hue/arete-app/issues).
+> **Version 1 (v1.0.0).** Home with to-dos, habits and goals; timetable; goals; daily log; stats;
+> your network; and the Claude chat box. Keep backups (Settings → Data → Back up now). Bug reports
+> and ideas are welcome in [Issues](https://github.com/spencertomj1-hue/arete-app/issues).
 
 ---
 
@@ -57,6 +57,11 @@ It runs entirely on your Mac as a normal app. It's built with [Streamlit](https:
 
 **Daily Log.** A month calendar showing each day's mood, sleep and energy. Click a day to read its notes, tick that day's habits (with current and best streaks), and save its entry. Habits are added and removed here too.
 
+**Network.** A map of the people you know, as a tree: you in the middle, a circle for each group branching off you, sub-groups branching off their group (e.g. Northfield → Physics Society, Robotics Lab), and people branching off the group they're in. Dashed lines join people who know each other.
+- **Adding:** tell Arete ("add Physics Society inside Northfield", "Priya is in Physics Society and knows Sam from football"), or use "Add someone" / "Add group". A group's card also has "Add person here" and "Add sub-group".
+- **Looking around:** click a person or group for its card (who they work for, a description, connections, members); click a name in a card to jump there. Drag to move things, scroll to zoom, search by name, and click a group in the legend to hide or show its whole branch.
+- **Editing:** every card has an Edit button that opens a dialog to change details, add or remove connections, move groups, or remove things.
+
 **Stats.** Charts of mood, energy and sleep, plus habit completion rates.
 
 **Claude chat.** Type or speak what you want changed, for example:
@@ -68,6 +73,7 @@ It runs entirely on your Mac as a normal app. It's built with [Streamlit](https:
 > "Tick off finish problem sheet"
 > "Set a goal of 12 gym sessions this month, counting my gym habit"
 > "I read 2 more books"
+> "Add Sam, a friend from uni who works at Northbank; she knows Alex from football"
 
 Claude only changes Arete's data, through a fixed set of actions. **Anything that deletes or overwrites data shows a preview with Confirm / Cancel first.** Voice input is transcribed **on your Mac**.
 

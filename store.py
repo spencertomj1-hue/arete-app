@@ -51,6 +51,16 @@ DEFAULT_CATEGORIES = [
 # Outlook events use this category unless settings.json says otherwise ("outlook_category").
 DEFAULT_OUTLOOK_CATEGORY = "classes"
 
+# Network groups (they colour people in the Network web); editable on the Network page.
+DEFAULT_NET_GROUPS = [
+    ("family", "Family", "#E5484D"),
+    ("friends", "Friends", "#F5A524"),
+    ("uni", "Uni", "#3E8EF7"),
+    ("work", "Work", "#30A46C"),
+    ("mentors", "Mentors", "#8E4EC6"),
+    ("other", "Other", "#8B8D98"),
+]
+
 # Typing one of these activities picks its category automatically.
 DEFAULT_LABEL_MAP = {
     "Sleep": "sleep", "Breakfast": "meals", "Lunch": "meals", "Dinner": "meals",
@@ -181,11 +191,36 @@ def init_db():
                 ord          INTEGER NOT NULL DEFAULT 0,
                 created_at   TEXT NOT NULL
             );
+
+            -- Network: people you know, the groups that colour them, and who knows whom
+            CREATE TABLE IF NOT EXISTS net_groups (
+                id     TEXT PRIMARY KEY,
+                name   TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                colour TEXT NOT NULL,                    -- "#RRGGBB"
+                ord    INTEGER NOT NULL,
+                parent_id TEXT                           -- the group it sits inside; NULL = top level
+            );
+            CREATE TABLE IF NOT EXISTS net_people (
+                id          TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                description TEXT,                        -- who they are, how you know them
+                works_for   TEXT,                        -- company, university, team...
+                group_id    TEXT REFERENCES net_groups(id) ON DELETE SET NULL,
+                created_at  TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS net_links (       -- undirected: always stored with a < b
+                a      TEXT NOT NULL REFERENCES net_people(id) ON DELETE CASCADE,
+                b      TEXT NOT NULL REFERENCES net_people(id) ON DELETE CASCADE,
+                reason TEXT,                             -- how they know each other
+                PRIMARY KEY (a, b),
+                CHECK (a < b)
+            );
             """
         )
         # Columns added after the first release.
         _add_column(conn, "tt_entries", "details", "TEXT")
         _add_column(conn, "tt_outlook", "description", "TEXT")
+        _add_column(conn, "net_groups", "parent_id", "TEXT")
         if conn.execute("SELECT COUNT(*) FROM tt_categories").fetchone()[0] == 0:
             conn.executemany(
                 "INSERT INTO tt_categories VALUES (?, ?, ?, ?, ?, ?)",
@@ -193,6 +228,9 @@ def init_db():
             )
         if conn.execute("SELECT COUNT(*) FROM tt_label_map").fetchone()[0] == 0:
             conn.executemany("INSERT INTO tt_label_map VALUES (?, ?)", DEFAULT_LABEL_MAP.items())
+        if conn.execute("SELECT COUNT(*) FROM net_groups").fetchone()[0] == 0:
+            conn.executemany("INSERT INTO net_groups (id, name, colour, ord) VALUES (?, ?, ?, ?)",
+                             [(gid, name, colour, i) for i, (gid, name, colour) in enumerate(DEFAULT_NET_GROUPS)])
 
 
 
@@ -1235,6 +1273,209 @@ def save_goals(df, replace=False):
             )
             count += 1
     return count
+
+
+# ---------------------------------------------------------------------------
+# Network: people, their groups (colours) and who knows whom.
+#
+# Links are undirected and stored once, with the smaller id first (net_links
+# has CHECK (a < b)), so "A knows B" and "B knows A" are the same row.
+# ---------------------------------------------------------------------------
+
+PERSON_COLS = ("id", "name", "description", "works_for", "group_id", "created_at")
+
+
+def net_groups():
+    """[{id, name, colour, parent_id}] in order: each group's sub-groups follow it."""
+    with db() as conn:
+        rows = conn.execute("SELECT id, name, colour, parent_id FROM net_groups ORDER BY ord, name").fetchall()
+    groups = [dict(zip(("id", "name", "colour", "parent_id"), r)) for r in rows]
+    ids = {g["id"] for g in groups}
+    out = []
+
+    def walk(parent):
+        for g in groups:
+            if g["parent_id"] == parent or (parent is None and g["parent_id"] not in ids):
+                out.append(g)
+                walk(g["id"])
+    walk(None)
+    return out
+
+
+def group_path(group_id, groups=None):
+    """"Northfield › Physics Society" for a sub-group, or just the name."""
+    by_id = {g["id"]: g for g in (groups or net_groups())}
+    names, gid = [], group_id
+    while gid in by_id and len(names) < 10:
+        names.append(by_id[gid]["name"])
+        gid = by_id[gid]["parent_id"]
+    return " › ".join(reversed(names))
+
+
+def _descendants(conn, group_id):
+    """Ids of a group's sub-groups, their sub-groups, and so on."""
+    found, todo = set(), [group_id]
+    while todo:
+        kids = [r[0] for r in conn.execute(
+            f"SELECT id FROM net_groups WHERE parent_id IN ({','.join('?' * len(todo))})", todo)]
+        todo = [k for k in kids if k not in found]
+        found.update(todo)
+    return found
+
+
+def find_net_group(name):
+    """A group's id by name (any case), or None. Group names are unique."""
+    with db() as conn:
+        row = conn.execute("SELECT id FROM net_groups WHERE name = ? COLLATE NOCASE", (str(name).strip(),)).fetchone()
+    return row[0] if row else None
+
+
+def add_net_group(name, colour=None, parent_id=None):
+    """A new group (inside `parent_id`, if given). Sub-groups take their parent's colour unless given one."""
+    name = str(name).strip()
+    if not name:
+        raise ValueError("A group needs a name.")
+    gid = uuid.uuid4().hex[:8]
+    with db() as conn:
+        if not colour and parent_id:
+            row = conn.execute("SELECT colour FROM net_groups WHERE id = ?", (parent_id,)).fetchone()
+            colour = row[0] if row else None
+        conn.execute("INSERT INTO net_groups (id, name, colour, ord, parent_id) "
+                     "VALUES (?, ?, ?, (SELECT COALESCE(MAX(ord) + 1, 0) FROM net_groups), ?)",
+                     (gid, name, (colour or "#8B8D98").upper(), parent_id))
+    return gid
+
+
+NO_CHANGE = object()   # update_net_group / update_person: leave this field as it is
+
+
+def update_net_group(group_id, name=None, colour=None, parent_id=NO_CHANGE):
+    """Rename, recolour or move a group (parent_id=None puts it at the top level)."""
+    fields = {}
+    if name is not None:
+        fields["name"] = str(name).strip()
+        if not fields["name"]:
+            raise ValueError("A group needs a name.")
+    if colour is not None:
+        fields["colour"] = colour.upper()
+    with db() as conn:
+        if parent_id is not NO_CHANGE:
+            if parent_id == group_id or parent_id in _descendants(conn, group_id):
+                raise ValueError("A group can't sit inside itself or one of its own sub-groups.")
+            fields["parent_id"] = parent_id
+        if fields:
+            conn.execute(f"UPDATE net_groups SET {', '.join(f'{k} = ?' for k in fields)} WHERE id = ?",
+                         (*fields.values(), group_id))
+
+
+def delete_net_group(group_id):
+    """Remove a group. Its sub-groups and people move up to the group it was inside (or the top level)."""
+    with db() as conn:
+        row = conn.execute("SELECT parent_id FROM net_groups WHERE id = ?", (group_id,)).fetchone()
+        if not row:
+            return
+        conn.execute("UPDATE net_groups SET parent_id = ? WHERE parent_id = ?", (row[0], group_id))
+        conn.execute("UPDATE net_people SET group_id = ? WHERE group_id = ?", (row[0], group_id))
+        conn.execute("DELETE FROM net_groups WHERE id = ?", (group_id,))
+
+
+def net_people():
+    """Everyone, by name."""
+    with db() as conn:
+        rows = conn.execute(f"SELECT {', '.join(PERSON_COLS)} FROM net_people ORDER BY name COLLATE NOCASE").fetchall()
+    return [dict(zip(PERSON_COLS, r)) for r in rows]
+
+
+def get_person(person_id):
+    with db() as conn:
+        row = conn.execute(f"SELECT {', '.join(PERSON_COLS)} FROM net_people WHERE id = ?", (person_id,)).fetchone()
+    return dict(zip(PERSON_COLS, row)) if row else None
+
+
+def find_people(name):
+    """People whose name matches exactly (any case), else whose name contains `name`."""
+    want = str(name).strip().lower()
+    everyone = net_people()
+    return [p for p in everyone if p["name"].lower() == want] or [p for p in everyone if want in p["name"].lower()]
+
+
+def _person_fields(name=None, description=None, works_for=None):
+    out = {}
+    if name is not None:
+        out["name"] = str(name).strip()
+        if not out["name"]:
+            raise ValueError("A person needs a name.")
+    if description is not None:
+        out["description"] = str(description).strip() or None
+    if works_for is not None:
+        out["works_for"] = str(works_for).strip() or None
+    return out
+
+
+def add_person(name, description=None, works_for=None, group_id=None, person_id=None):
+    """Add someone to the network; returns them."""
+    fields = _person_fields(name, description, works_for)
+    person_id = person_id or uuid.uuid4().hex
+    with db() as conn:
+        conn.execute(f"INSERT INTO net_people ({', '.join(PERSON_COLS)}) VALUES (?, ?, ?, ?, ?, ?)",
+                     (person_id, fields["name"], fields.get("description"), fields.get("works_for"), group_id,
+                      datetime.now(TZ).isoformat(timespec="seconds")))
+    return get_person(person_id)
+
+
+KEEP_GROUP = NO_CHANGE
+
+
+def update_person(person_id, name=None, description=None, works_for=None, group_id=KEEP_GROUP):
+    """Change any of name, description, works_for (None = leave as is; "" = clear) and group (None = no group)."""
+    fields = _person_fields(name, description, works_for)
+    if group_id is not KEEP_GROUP:
+        fields["group_id"] = group_id
+    if fields:
+        with db() as conn:
+            conn.execute(f"UPDATE net_people SET {', '.join(f'{k} = ?' for k in fields)} WHERE id = ?",
+                         (*fields.values(), person_id))
+
+
+def delete_person(person_id):
+    """Remove someone (and their connections)."""
+    with db() as conn:
+        conn.execute("DELETE FROM net_people WHERE id = ?", (person_id,))
+
+
+def _pair(a, b):
+    if a == b:
+        raise ValueError("Someone can't be connected to themselves.")
+    return (a, b) if a < b else (b, a)
+
+
+def link_people(a, b, reason=None):
+    """Connect two people (or update why they're connected)."""
+    a, b = _pair(a, b)
+    with db() as conn:
+        conn.execute("INSERT INTO net_links VALUES (?, ?, ?) ON CONFLICT(a, b) DO UPDATE SET reason = excluded.reason",
+                     (a, b, (str(reason).strip() or None) if reason else None))
+
+
+def unlink_people(a, b):
+    a, b = _pair(a, b)
+    with db() as conn:
+        conn.execute("DELETE FROM net_links WHERE a = ? AND b = ?", (a, b))
+
+
+def net_links():
+    """[{a, b, reason}] for every connection."""
+    with db() as conn:
+        rows = conn.execute("SELECT a, b, reason FROM net_links").fetchall()
+    return [{"a": a, "b": b, "reason": r} for a, b, r in rows]
+
+
+def connections_of(person_id):
+    """[(other person, reason)] for one person, by name."""
+    people = {p["id"]: p for p in net_people()}
+    out = [(people[l["b"] if l["a"] == person_id else l["a"]], l["reason"])
+           for l in net_links() if person_id in (l["a"], l["b"])]
+    return sorted(out, key=lambda x: x[0]["name"].lower())
 
 
 # ---------------------------------------------------------------------------

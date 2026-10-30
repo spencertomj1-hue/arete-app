@@ -139,6 +139,23 @@ What the app tracks
     If a habit with a matching name exists, ask whether to count that habit or update it by hand.
   - edit_goal changes the title, target, unit or linked habit; delete_goal needs the user's confirmation.
 
+- Network: the people the user knows, shown as a web on the Network page, coloured by group.
+  Each person has a name, an optional description (who they are / how the user knows them),
+  works_for (company, university, team) and a group (see find_people for the list).
+  Groups can have sub-groups, e.g. "Northfield" containing "Physics Society" and "Robotics Lab"; in the
+  web the user sits in the middle, each group branches off them, sub-groups branch off their group,
+  and people branch off the group they're in. Put people in the most specific group that fits.
+  - "add Physics Society and Robotics Lab under Northfield" -> add_group("Physics Society", inside="Northfield") etc.
+    (add Northfield first if it doesn't exist). edit_group renames, recolours or moves a group;
+    delete_group needs the user's confirmation.
+  - "Sam works at Google, a friend from uni" -> add_person(name="Sam", works_for="Google",
+    group="Friends", description="Friend from uni"). Pick the group that fits best; if none does, ask.
+  - Connections between people are separate: connect_people(person, other, reason), e.g. "Sam knows
+    Alex from football" -> connect_people("Sam", "Alex", reason="Football"). Add anyone new first.
+    Everyone is already linked to the user in the web, so never connect someone to the user.
+  - Use find_people to look someone up or check who exists before adding (avoid duplicates).
+  - disconnect_people and delete_person need the user's confirmation.
+
 {tools.list_categories().text}
 
 Confirmations
@@ -247,6 +264,35 @@ TOOL_SPECS = [
     ("list_goals", "List goals with progress and ids for the month and year containing a date (default today).",
      _schema([], period=GOAL_PERIOD, date=DATE), tools.list_goals),
     ("delete_goal", "Delete a goal, found by title (or id).", _schema(["goal"], **GOAL_REF), tools.delete_goal),
+    ("add_person", "Add someone to the user's network.",
+     _schema(["name"], name={"type": "string"}, description={"type": "string", "description": "who they are / how the user knows them"},
+             works_for={"type": "string", "description": "company, university or team"},
+             group={"type": "string", "description": "a network group, e.g. 'Friends'"}),
+     tools.add_person),
+    ("update_person", "Change a person's name, description, works_for or group (by name or id).",
+     _schema(["person"], person={"type": "string"}, name={"type": "string"}, description={"type": "string"},
+             works_for={"type": "string"}, group={"type": "string"}, clear_group={"type": "boolean"}),
+     tools.update_person),
+    ("connect_people", "Record that two people in the network know each other, and why.",
+     _schema(["person", "other"], person={"type": "string"}, other={"type": "string"},
+             reason={"type": "string", "description": "how they know each other, e.g. 'Work together at Google'"}),
+     tools.connect_people),
+    ("disconnect_people", "Remove the connection between two people.",
+     _schema(["person", "other"], person={"type": "string"}, other={"type": "string"}), tools.disconnect_people),
+    ("delete_person", "Remove someone from the network (and their connections).",
+     _schema(["person"], person={"type": "string"}), tools.delete_person),
+    ("add_group", "Add a network group, optionally inside another group as a sub-group (e.g. 'Physics Society' inside 'Northfield').",
+     _schema(["name"], name={"type": "string"}, inside={"type": "string", "description": "the parent group's name"},
+             colour={"type": "string", "description": "hex, e.g. #3E8EF7 (sub-groups default to their parent's)"}),
+     tools.add_group),
+    ("edit_group", "Rename, recolour or move a network group (inside another group, or top_level=true).",
+     _schema(["group"], group={"type": "string"}, name={"type": "string"}, inside={"type": "string"},
+             top_level={"type": "boolean"}, colour={"type": "string"}),
+     tools.edit_group),
+    ("delete_group", "Delete a network group; its people and sub-groups move up a level.",
+     _schema(["group"], group={"type": "string"}), tools.delete_group),
+    ("find_people", "List people in the network (with ids, groups and connections), optionally filtered by a search.",
+     _schema([], query={"type": "string"}), tools.find_people),
     ("set_activity_default", "Set which category an activity label (e.g. 'Lecture') uses by default.",
      _schema(["label", "category"], label={"type": "string"}, category={"type": "string"}),
      tools.set_activity_default),

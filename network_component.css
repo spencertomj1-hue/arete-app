@@ -1,0 +1,194 @@
+/* Network web — people as coloured dots, using the app's font and theme. */
+
+.nw-root {
+  --text: var(--st-text-color, #31333f);
+  --bg: var(--st-background-color, #fff);
+  --soft: var(--st-secondary-background-color, #f6f7f9);
+  --line: rgba(128, 128, 128, 0.22);
+  --muted: rgba(128, 128, 128, 0.95);
+  --accent: var(--st-primary-color, #ff4b4b);
+  --radius: var(--st-base-radius, 0.5rem);
+  font: inherit;
+  color: var(--text);
+}
+
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+/* ---------- Search + legend ---------- */
+
+.nw-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.nw-search {
+  width: 14em;
+  padding: 5px 12px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 0.85rem;
+  outline: none;
+}
+.nw-search:focus { border-color: var(--accent); }
+.nw-legend { display: flex; flex-wrap: wrap; gap: 4px; }
+.nw-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.78rem;
+}
+.nw-key i { width: 10px; height: 10px; border-radius: 50%; }
+.nw-key small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.nw-key:hover { background: rgba(128, 128, 128, 0.1); }
+.nw-key.off { opacity: 0.4; text-decoration: line-through; }
+
+/* ---------- The web ---------- */
+
+.nw-stage {
+  position: relative;
+  height: max(440px, 68vh);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(128, 128, 128, 0.07), transparent 65%),
+    var(--bg);
+}
+.nw-svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; user-select: none; }
+.nw-svg:active { cursor: grabbing; }
+
+.nw-edge { stroke: rgba(128, 128, 128, 0.55); stroke-width: 1.4; transition: opacity 0.15s; }
+.nw-edge.tree { stroke-width: 2; stroke-opacity: 0.45; }
+.nw-edge.tree.me { stroke: rgba(128, 128, 128, 0.5); stroke-opacity: 1; }
+.nw-edge.link { stroke: rgba(128, 128, 128, 0.6); stroke-width: 1.3; stroke-dasharray: 5 4; }
+.nw-edge.lit { stroke: var(--accent); stroke-width: 2.2; opacity: 1; }
+.nw-edge.dim { opacity: 0.12; }
+
+.nw-node { cursor: pointer; transition: opacity 0.15s; }
+.nw-node circle { stroke: var(--bg); stroke-width: 2.5; transition: stroke 0.15s; }
+.nw-node text {
+  font-size: calc(13px * var(--label, 1));
+  font-weight: 500;
+  text-anchor: middle;
+  fill: var(--text);
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.nw-node.me circle { fill: var(--text); }
+.nw-node.hub circle { fill-opacity: 0.16; stroke-width: 2.5; }
+.nw-node.hub text { font-weight: 700; font-size: calc(12px * var(--label, 1)); fill: var(--text); }
+.nw-node.hub.sub circle { stroke-width: 2; stroke-dasharray: 4 3; }
+.nw-node.hub.sub text { font-size: calc(11px * var(--label, 1)); }
+.nw-node.me text { font-weight: 700; }
+.nw-node.person:hover circle, .nw-node.me:hover circle { stroke: var(--text); }
+.nw-node.hub:hover circle { fill-opacity: 0.28; }
+.nw-node.sel circle { stroke: var(--accent); stroke-width: 3.5; }
+.nw-node.sel text, .nw-node.match text { font-weight: 700; }
+.nw-node.match circle { stroke: var(--accent); }
+.nw-node.dim { opacity: 0.18; }
+
+/* ---------- Empty state, zoom buttons ---------- */
+
+.nw-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  pointer-events: none;
+}
+.nw-empty[hidden], .nw-card[hidden] { display: none; }
+.nw-empty b { color: var(--text); }
+
+.nw-zoom { position: absolute; left: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
+.nw-zoom button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 1rem;
+  line-height: 1;
+}
+.nw-zoom button:hover { background: var(--soft); }
+
+/* ---------- Person card ---------- */
+
+.nw-card {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: min(290px, calc(100% - 20px));
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  font-size: 0.86rem;
+}
+.nw-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.nw-name { font-size: 1.15rem; font-weight: 650; margin-right: 18px; }
+.nw-chip {
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: var(--soft);
+  font-size: 0.75rem;
+}
+.nw-chip:hover { background: rgba(128, 128, 128, 0.18); }
+.nw-chip i, .nw-links i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.nw-row { margin-top: 8px; }
+.nw-row span { color: var(--muted); margin-right: 6px; }
+.nw-desc { margin: 8px 0 0; line-height: 1.45; }
+.nw-sub { margin-top: 12px; font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.nw-links { list-style: none; margin: 4px 0 0; padding: 0; }
+.nw-links li { padding: 4px 0; border-bottom: 1px solid var(--line); }
+.nw-links li:last-child { border-bottom: none; }
+.nw-links button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-weight: 600;
+}
+.nw-links button:hover { color: var(--accent); }
+.nw-links span { display: block; padding-left: 15px; color: var(--muted); font-size: 0.8rem; }
+.nw-none { margin-top: 4px; color: var(--muted); }
+.nw-links button:disabled { opacity: 0.55; cursor: default; }
+.nw-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 12px; }
+.nw-actions button {
+  padding: 4px 12px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 0.8rem;
+}
+.nw-actions button:hover { background: var(--soft); }
+.nw-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }

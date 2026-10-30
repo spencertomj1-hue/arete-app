@@ -711,3 +711,171 @@ def list_goals(period=None, date=None):
             how = f"; counts habit {g['habit']}" if g["habit"] else ""
             lines.append(f"- {g['title']}: {_amount(g)} ({pct}%) (id {g['id']}{how})")
     return Result("\n".join(lines))
+
+
+# ---------------------------------------------------------------------------
+# Network: people, their groups and who knows whom
+# ---------------------------------------------------------------------------
+
+def _group_names():
+    """"Family, Friends, Northfield (Physics Society, Robotics Lab), ..." - top-level groups with their sub-groups."""
+    groups = store.net_groups()
+
+    def named(gid):
+        g = next(x for x in groups if x["id"] == gid)
+        kids = [named(k["id"]) for k in groups if k["parent_id"] == g["id"]]
+        return g["name"] + (f" ({', '.join(kids)})" if kids else "")
+    ids = {g["id"] for g in groups}
+    return ", ".join(named(g["id"]) for g in groups if g["parent_id"] not in ids) or "none"
+
+
+def _group_id(name):
+    if not name:
+        return None
+    gid = store.find_net_group(name)
+    if gid is None:
+        raise ToolError(f"There's no group called '{name}'. Groups: {_group_names()}. "
+                        "Use one of those, or add_group if the user wants a new one.")
+    return gid
+
+
+def describe_person(p):
+    bits = [store.group_path(p["group_id"]) if p["group_id"] else None,
+            f"works for {p['works_for']}" if p["works_for"] else None]
+    bits = [b for b in bits if b]
+    return p["name"] + (f" ({', '.join(bits)})" if bits else "")
+
+
+def _find_person(person):
+    """Someone by id, or by name (exact, then part of a name)."""
+    found = store.get_person(str(person).strip())
+    if found:
+        return found
+    matches = store.find_people(person)
+    if len(matches) == 1:
+        return matches[0]
+    if matches:
+        options = "; ".join(f"id {p['id']}: {describe_person(p)}" for p in matches)
+        raise ToolError(f"More than one person matches '{person}': {options}. Ask the user which one, or pass the id.")
+    raise ToolError(f"There's no one called '{person}' in the network. Add them with add_person first.")
+
+
+def add_person(name, description=None, works_for=None, group=None):
+    name = str(name).strip()
+    if not name:
+        raise ToolError("The person needs a name.")
+    gid = _group_id(group)
+    same = [p for p in store.find_people(name) if p["name"].lower() == name.lower()]
+    if same:
+        return Result(f"There's already someone called {same[0]['name']}: {describe_person(same[0])} (id {same[0]['id']}). "
+                      "If this is a different person, ask the user how to tell them apart (e.g. a surname); "
+                      "otherwise use update_person.")
+    p = store.add_person(name, description, works_for, gid)
+    return Result(f"Added {describe_person(p)} to the network (id {p['id']}).", changed=True)
+
+
+def update_person(person, name=None, description=None, works_for=None, group=None, clear_group=False):
+    p = _find_person(person)
+    gid = None if clear_group else _group_id(group) if group else store.KEEP_GROUP
+    if name is None and description is None and works_for is None and gid is store.KEEP_GROUP:
+        raise ToolError("Say what to change: name, description, works_for or group.")
+    store.update_person(p["id"], name, description, works_for, gid)
+    return Result(f"Updated {describe_person(store.get_person(p['id']))}.", changed=True)
+
+
+def connect_people(person, other, reason=None):
+    a, b = _find_person(person), _find_person(other)
+    if a["id"] == b["id"]:
+        raise ToolError("Someone can't be connected to themselves.")
+    store.link_people(a["id"], b["id"], reason)
+    why = f" ({reason})" if reason else ""
+    return Result(f"Connected {a['name']} and {b['name']}{why}.", changed=True)
+
+
+def disconnect_people(person, other, confirmed=False):
+    a, b = _find_person(person), _find_person(other)
+    if not any(o["id"] == b["id"] for o, _ in store.connections_of(a["id"])):
+        return Result(f"{a['name']} and {b['name']} aren't connected.")
+    summary = f"Remove the connection between {a['name']} and {b['name']}"
+    if not confirmed:
+        return Result("", pending=Pending(summary, lambda: disconnect_people(a["id"], b["id"], True)))
+    store.unlink_people(a["id"], b["id"])
+    return Result(f"Done: {summary}.", changed=True)
+
+
+def delete_person(person, confirmed=False):
+    p = _find_person(person)
+    n = len(store.connections_of(p["id"]))
+    summary = f"Remove {describe_person(p)} from the network" + (f", with their {n} connection{'s' * (n != 1)}" if n else "")
+    if not confirmed:
+        return Result("", pending=Pending(summary, lambda: delete_person(p["id"], True)))
+    store.delete_person(p["id"])
+    return Result(f"Done: {summary}.", changed=True)
+
+
+def _colour(colour):
+    if colour and not re.fullmatch(r"#[0-9A-Fa-f]{6}", colour.strip()):
+        raise ToolError("colour must be a hex code like #3E8EF7.")
+    return colour.strip() if colour else None
+
+
+def _find_group(name):
+    """A group's id, by name or id."""
+    if any(g["id"] == name for g in store.net_groups()):
+        return name
+    gid = store.find_net_group(name)
+    if gid is None:
+        raise ToolError(f"There's no group called '{name}'. Groups: {_group_names()}.")
+    return gid
+
+
+def add_group(name, inside=None, colour=None):
+    """A new group, optionally inside another (a sub-group, e.g. 'Physics Society' inside 'Northfield')."""
+    if store.find_net_group(name):
+        return Result(f"There's already a group called '{name}' ({store.group_path(store.find_net_group(name))}).")
+    gid = store.add_net_group(name, _colour(colour), _find_group(inside) if inside else None)
+    return Result(f"Added the group {store.group_path(gid)}.", changed=True)
+
+
+def edit_group(group, name=None, inside=None, top_level=False, colour=None):
+    """Rename, recolour or move a group (inside another group, or to the top level)."""
+    gid = _find_group(group)
+    parent = None if top_level else _find_group(inside) if inside else store.NO_CHANGE
+    if name is None and colour is None and parent is store.NO_CHANGE:
+        raise ToolError("Say what to change: name, inside, top_level or colour.")
+    try:
+        store.update_net_group(gid, name, _colour(colour), parent)
+    except ValueError as e:
+        raise ToolError(str(e))
+    return Result(f"Updated the group {store.group_path(gid)}.", changed=True)
+
+
+def delete_group(group, confirmed=False):
+    gid = _find_group(group)
+    path = store.group_path(gid)
+    parent = path.rsplit(" › ", 1)[0] if " › " in path else None
+    summary = f"Delete the group {path}; its people and sub-groups move to " + (parent or "the top level")
+    if not confirmed:
+        return Result("", pending=Pending(summary, lambda: delete_group(gid, True)))
+    store.delete_net_group(gid)
+    return Result(f"Done: {summary}.", changed=True)
+
+
+def find_people(query=None):
+    """Everyone (or those whose name, description or employer mentions `query`), with their connections."""
+    people = store.net_people()
+    if query:
+        q = str(query).strip().lower()
+        people = [p for p in people if q in " ".join(filter(None, (p["name"], p["description"], p["works_for"]))).lower()]
+    lines = [f"Groups: {_group_names()}."]
+    for p in people:
+        line = f"- id {p['id']}: {describe_person(p)}"
+        if p["description"]:
+            line += f": {p['description']}"
+        links = store.connections_of(p["id"])
+        if links:
+            line += ". Knows " + "; ".join(o["name"] + (f" ({r})" if r else "") for o, r in links)
+        lines.append(line)
+    if len(lines) == 1:
+        lines.append("No one matches." if query else "The network is empty.")
+    return Result("\n".join(lines))

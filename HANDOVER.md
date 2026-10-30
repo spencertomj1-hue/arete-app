@@ -37,6 +37,9 @@ daily_log.py                 Daily Log page (month calendar, day card, the day's
 todos.py                     Home's to-do cards: the to-do list component's Python side
 todos_component.js/.css      The Reminders-style to-do lists (3 compact cards: day, week, month)
 goals.py                     Goals page and Home's goal bars (native Streamlit widgets + an HTML bar)
+sidebar_theme.py             The sidebar's look: marble background (Images/sidebar.webp, embedded as a data URI), no title, narrow, a box per menu item
+network.py                   Network page: the web component's Python side, plus edit / add / group forms
+network_component.js/.css    The people web (SVG + a small force layout, no libraries)
 calendar_component.js/.css   The month calendar component
 tools.py                     What Claude can do: plain functions over store.py, previews for destructive changes
 assistant.py                 Claude via claude-agent-sdk: finds the CLI, system prompt, in-process "arete" MCP server
@@ -66,6 +69,9 @@ tests/                       pytest + AppTest; tests/fixtures/sample.ics is a fa
 | `tt_outlook_hidden` | Outlook occurrences the user removed or detached (kept across syncs) |
 | `todos` | `id`, `title`, `notes`, `period` (daily/weekly/monthly), `period_start` (the day, its Monday or the 1st), `done`, `done_at`, `"repeat"`, `ord`, `created_at` |
 | `todo_rollover` | Per period kind, the last period repeating to-dos were copied into (see §5b) |
+| `net_groups` | Network groups: `id`, `name` (unique, any case), `colour`, `ord`, `parent_id` (the group it's inside; NULL = top level; no loops). Seeded from `DEFAULT_NET_GROUPS` |
+| `net_people` | `id`, `name` (not unique), `description`, `works_for`, `group_id` (`ON DELETE SET NULL`), `created_at` |
+| `net_links` | Undirected connections: `a`, `b` (always `a < b`, enforced by a CHECK), `reason`. Cascade-deleted with either person |
 | `goals` | `id`, `title`, `period` (monthly/yearly), `period_start`, `target`, `unit`, `progress` (kept by hand), `habit_id` (NULL = by hand; `ON DELETE SET NULL`), `ord`, `created_at` |
 
 Notes on the schema:
@@ -109,6 +115,13 @@ Two different things:
 - **Goals page:** two bordered sections (Monthly, Yearly), each with ‹ › and a "This month / This year" jump (`goals_start_<period>`). Each goal shows `value / target unit`, a percentage and a bar. Hand-kept goals have − / + (via `add_goal_progress`); every goal has a ⋯ popover to edit it (including the "Update it myself" / "Count a habit's ticks" choice) or delete it. "New goal" is a popover with the same form.
 - **Bars:** HTML in the theme's primary colour (`st.progress` uses a different one), the same on both pages.
 - **Home:** this month's and this year's goals as bars, with "See all" (a button whose callback sets the sidebar radio, `page`).
+
+## 5c. Network
+
+- **Tree:** You → a hub circle per group (ids `g:<group id>`) → sub-group hubs → people; ungrouped people hang off You. Only groups with someone in them (or below them) get a hub. Tree lines are solid and tinted with the parent's colour; person-to-person links are dashed.
+- **Web (`network_component.*`, key `network`):** SVG drawn once per data change; positions come from a small force simulation (repulsion, with hubs and You pushing harder; springs along tree lines, short for people, longer for groups; weak springs for cross-links; a weak pull to the centre; speeds capped). New data is pre-settled for up to 400 steps, then fitted to the frame the first time. Labels scale up when zoomed out (`--label`). Positions, pan/zoom and hidden top-level groups are kept in sessionStorage. A dragged circle stays where it's dropped.
+- **Cards and dialogs:** selection is local to the JS. Card buttons send `edit` `{kind: person|group, id}`, `{kind: new_person, group}` or `{kind: new_group, parent}`; `_on_edit` stores it in `net_edit`, and `render_page` pops it and opens the matching `st.dialog` once (clicks inside a dialog rerun only the dialog). Dialog buttons are never disabled: Streamlit text boxes only commit on Enter/blur, so they validate on click instead.
+- **Claude:** `add_person`, `update_person`, `connect_people`, `disconnect_people` (confirm), `delete_person` (confirm), `add_group` (with `inside`), `edit_group` (rename/recolour/move), `delete_group` (confirm; its people and sub-groups move up a level), `find_people` (lists groups as a tree). Names aren't unique: lookups match an exact name first, then part of a name, and several matches is an error that lists them. Everyone is implicitly linked to the user, so there's no "me" person.
 
 ## 6. Outlook import (`outlook.py`)
 
