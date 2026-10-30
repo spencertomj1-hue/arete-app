@@ -15,6 +15,7 @@ import streamlit as st
 
 import chat
 import daily_log
+import goals
 import settings_ui
 import store
 import timetable
@@ -74,13 +75,14 @@ def _agenda():
 
 
 def page_home():
-    """Landing page: agenda + today's Plan / Actual on the left, the Ask box on the right."""
+    """Landing page: agenda + today's Plan / Actual on the left, the Ask box and goal cards on the right."""
     left, right = st.columns([2, 3], gap="large")
     with left:
         _agenda()
         timetable.render_today()
     with right:
         chat.render(inline=True)
+        goals.render_home()
 
 
 DAY_MS = 24 * 60 * 60 * 1000   # Plotly measures date steps in milliseconds
@@ -203,6 +205,7 @@ if settings_ui.needs_wizard():
 
 PAGES = {
     "Home": page_home,
+    goals.PAGE: goals.render_page,
     "Timetable": timetable.render_page,
     "Daily log": daily_log.page_daily_log,
     "Habits": daily_log.page_habits,
@@ -211,7 +214,8 @@ PAGES = {
 }
 
 st.sidebar.title("Arete")
-choice = st.sidebar.radio("Go to", list(PAGES), label_visibility="collapsed")
+# Keyed so the Home goal cards' "See all" can switch to the Goals page.
+choice = st.sidebar.radio("Go to", list(PAGES), label_visibility="collapsed", key="page")
 PAGES[choice]()
 
 # The Claude chat bar, pinned to the bottom of every page (Home has it inline).

@@ -280,3 +280,23 @@ def _data_section():
         else:
             store.save_all_data(new, replace=mode.startswith("Replace"))
             st.success(f"Imported {len(new)} rows.")
+
+    st.subheader("Goals")
+    st.write("Goals export and import as their own CSV, one row per goal.")
+    st.download_button("Download goals CSV", store.load_goals().to_csv(index=False),
+                       file_name=f"arete_goals_{date.today()}.csv", mime="text/csv", icon=":material/download:")
+    st.write(
+        "To import, use the same columns: `title`, `period` (daily, weekly, monthly or yearly) and "
+        "`period_start` (YYYY-MM-DD, any day in the period) are needed; `id`, `notes`, `done`, `done_at`, "
+        "`repeat`, `ord` and `created_at` are optional. A row whose `id` already exists updates that goal."
+    )
+    goals_file = st.file_uploader("Goals CSV file", type="csv", key="goals_csv")
+    goals_mode = st.radio("Goals import mode", ["Merge (update matching ids)", "Replace all existing goals"],
+                          key="goals_mode")
+    if goals_file and st.button("Import goals", icon=":material/upload:"):
+        new = pd.read_csv(goals_file)
+        if not {"title", "period"} <= set(new.columns):
+            st.error("The CSV needs `title` and `period` columns.")
+        else:
+            count = store.save_goals(new, replace=goals_mode.startswith("Replace"))
+            st.success(f"Imported {count} goals.")
