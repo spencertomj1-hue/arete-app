@@ -32,7 +32,14 @@ def apply():
     [data-testid="stSidebar"] [data-testid="stElementContainer"]:has(h1) {{ display: none; }}
 
     /* Narrow: just wider than the longest menu box. */
-    [data-testid="stSidebar"] {{ width: 196px !important; min-width: 196px !important; max-width: 196px !important; }}
+    /* Only while it's open: closed, it takes no room, so the page slides across to fill it. */
+    [data-testid="stSidebar"] {{ transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, transform 0.3s ease; }}
+    [data-testid="stSidebar"][data-collapsed="false"] {{
+        width: 196px !important; min-width: 196px !important; max-width: 196px !important;
+    }}
+    [data-testid="stSidebar"][data-collapsed="true"] {{
+        width: 0 !important; min-width: 0 !important; max-width: 0 !important;
+    }}
 
     /* Each bit of text gets its own small box, so the veins never run through it. */
     [data-testid="stSidebar"] [data-testid="stRadioOption"],
