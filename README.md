@@ -11,6 +11,10 @@
 
 <p align="center"><em>No summit, just the climb.</em></p>
 
+> **Alpha (v0.1.0-alpha).** Arete works day to day, but it's early: expect rough edges and changes
+> between versions, and keep backups (Settings → Data → Back up now). Bug reports and ideas are
+> welcome in [Issues](https://github.com/spencertomj1-hue/arete-app/issues).
+
 ---
 
 *Arete* (ἀρετή) is the Greek idea of excellence: living up to your potential. Arete helps by recording each day honestly: what you planned, what you actually did, how you felt and which habits you kept.
@@ -106,8 +110,8 @@ Claude only changes Arete's data, through a fixed set of actions. **Anything tha
 Open the **Terminal** app and run:
 
 ```bash
-git clone https://github.com/<your-username>/arete.git
-cd arete
+git clone https://github.com/spencertomj1-hue/arete-app.git
+cd arete-app
 ./setup.sh
 ```
 
