@@ -117,7 +117,9 @@ def test_wizard_shows_on_a_fresh_data_folder_and_finishes(store, monkeypatch):
     assert at.title[0].value == "Welcome to Arete"
     assert not at.sidebar.radio                                  # no app yet
 
-    at.button(key="wiz_next").click().run()                      # -> Claude
+    at.button(key="wiz_next").click().run()                      # -> Claude: an API key, by default
+    assert at.text_input[0].label == "Anthropic API key"
+    at.radio(key="wiz_claude_way").set_value("Use my Claude subscription (Claude Code)").run()
     assert any(setup_checks.INSTALL_CMD in c.value for c in at.code)
     at.button(key="wiz_skip").click().run()                      # -> Calendar
     assert any("Publish a calendar" in m.value for m in at.markdown)
@@ -131,3 +133,45 @@ def test_wizard_shows_on_a_fresh_data_folder_and_finishes(store, monkeypatch):
 
     # Reopening the app later doesn't show it again.
     assert AppTest.from_file(APP, default_timeout=60).run().sidebar.radio
+
+
+def test_api_key_setup(store, monkeypatch):
+    """Pasting a key: it's checked, saved in the (fake) secret store, and then Claude counts as ready."""
+    from arete import assistant
+    from arete import setup_checks
+    monkeypatch.setattr(assistant, "find_claude", lambda: "/sdk/_bundled/claude")
+    monkeypatch.setattr(assistant, "bundled_claude", lambda: "/sdk/_bundled/claude")
+    status = setup_checks.claude_status()
+    assert not status["logged_in"] and status["bundled"] and not status["found"]
+
+    checked = []
+    monkeypatch.setattr(assistant, "check_api_key", lambda key: (checked.append(key) or key.endswith("good"), "nope"))
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at.sidebar.radio[0].set_value("Settings").run()
+    at.text_input[[t.label for t in at.text_input].index("Anthropic API key")].input("sk-ant-bad")
+    at.button[[b.label for b in at.button].index("Save key")].click().run()
+    assert checked == ["sk-ant-bad"] and not assistant.saved_api_key()
+    assert any(e.value == "nope" for e in at.error)
+
+    at.text_input[[t.label for t in at.text_input].index("Anthropic API key")].input("sk-ant-good")
+    at.button[[b.label for b in at.button].index("Save key")].click().run()
+    assert assistant.api_key() == "sk-ant-good"
+    assert setup_checks.claude_status()["account"] == "API key"
+    assert assistant._env("/sdk/_bundled/claude")["ANTHROPIC_API_KEY"] == "sk-ant-good"
+    assert any("using an Anthropic API key" in s.value for s in at.success)
+
+    assistant.forget_api_key()
+    assert assistant.api_key() is None
+
+
+def test_check_api_key_messages(monkeypatch):
+    from arete import assistant
+    assert not assistant.check_api_key("hello")[0]                       # not even the right shape
+
+    class Reply:
+        def __init__(self, code):
+            self.status_code = code
+    for code, ok, words in ((200, True, "works"), (401, False, "didn't accept"), (500, False, "error (500)")):
+        monkeypatch.setattr(assistant.requests, "get", lambda *a, code=code, **k: Reply(code))
+        result = assistant.check_api_key("sk-ant-x")
+        assert result[0] is ok and words in result[1] and "sk-ant-x" not in result[1]

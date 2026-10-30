@@ -1,10 +1,12 @@
 """
 Claude for Arete: turns a chat message into tool calls on the user's data.
 
-Uses claude-agent-sdk, which drives the local `claude` CLI, so it runs on the
-user's Claude Code login (or ANTHROPIC_API_KEY if that's set in the environment;
-the CLI prefers it automatically). Claude only gets the in-process "arete"
-MCP tools below: no Bash, files or web.
+Uses claude-agent-sdk, which drives the `claude` CLI: the user's own Claude
+Code if it's installed, otherwise the copy bundled inside the SDK. It signs in
+with either an Anthropic API key (pasted in Settings and kept in the system's
+secret store, or $ANTHROPIC_API_KEY; the CLI prefers a key automatically) or
+the user's Claude Code login. Claude only gets the in-process "arete" MCP
+tools below: no Bash, files or web.
 
 Arete.app starts from Finder with a bare PATH, so the CLI is located
 explicitly (see find_claude) and USER/HOME are passed through, because the CLI
@@ -17,6 +19,10 @@ import getpass
 import json
 import os
 import shutil
+
+import claude_agent_sdk
+import keyring
+import requests
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -46,7 +52,7 @@ CLAUDE_CANDIDATES = [
     "~/.bun/bin/claude.exe",
 ]
 
-LOGIN_HELP = (f"Claude isn't logged in. Open {'PowerShell' if system.IS_WINDOWS else 'Terminal'}, run `claude`, and log in with /login. "
+LOGIN_HELP = ("Claude isn't set up yet. In Settings → Claude, paste an Anthropic API key, or sign in to Claude Code. "
               "Then try again.")
 
 
@@ -71,7 +77,70 @@ def find_claude():
     for path in candidates:
         if path.is_file() and os.access(path, os.X_OK):
             return str(path)
-    return None
+    return bundled_claude()
+
+
+def bundled_claude():
+    """The copy of the claude CLI that ships inside claude-agent-sdk, if there is one."""
+    path = Path(claude_agent_sdk.__file__).parent / "_bundled" / ("claude.exe" if system.IS_WINDOWS else "claude")
+    return str(path) if path.is_file() else None
+
+
+# ---------------------------------------------------------------------------
+# Anthropic API key (an alternative to a Claude Code login), kept in the
+# system's secret store (macOS Keychain / Windows Credential Manager)
+# ---------------------------------------------------------------------------
+
+KEY_SERVICE, KEY_ACCOUNT = "Arete", "anthropic-api-key"
+
+
+def api_key():
+    """The key to use: $ANTHROPIC_API_KEY, else the one saved in Settings, else None."""
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return os.environ["ANTHROPIC_API_KEY"]
+    try:
+        return keyring.get_password(KEY_SERVICE, KEY_ACCOUNT) or None
+    except Exception:          # no usable secret store
+        return None
+
+
+def saved_api_key():
+    """Whether a key was saved in Settings (rather than coming from the environment)."""
+    try:
+        return bool(keyring.get_password(KEY_SERVICE, KEY_ACCOUNT))
+    except Exception:
+        return False
+
+
+def save_api_key(key):
+    keyring.set_password(KEY_SERVICE, KEY_ACCOUNT, key.strip())
+
+
+def forget_api_key():
+    try:
+        keyring.delete_password(KEY_SERVICE, KEY_ACCOUNT)
+    except Exception:
+        pass
+
+
+def check_api_key(key):
+    """
+    (ok, message): asks Anthropic whether the key works, using the free "list
+    models" call (no tokens spent). The key itself never appears in a message.
+    """
+    key = key.strip()
+    if not key.startswith("sk-ant-"):
+        return False, "That doesn't look like an Anthropic API key (they start with sk-ant-)."
+    try:
+        r = requests.get("https://api.anthropic.com/v1/models",
+                         headers={"x-api-key": key, "anthropic-version": "2023-06-01"}, timeout=15)
+    except requests.RequestException:
+        return False, "Couldn't reach Anthropic. Check your internet connection and try again."
+    if r.status_code == 200:
+        return True, "The key works."
+    if r.status_code in (401, 403):
+        return False, "Anthropic didn't accept that key. Check you copied all of it, and that it hasn't been revoked."
+    return False, f"Anthropic answered with an error ({r.status_code}). Try again in a minute."
 
 
 def _env(claude_path):
@@ -85,6 +154,9 @@ def _env(claude_path):
            "HOME": os.environ.get("HOME") or str(Path.home())}
     if system.IS_WINDOWS:
         env["USERPROFILE"] = os.environ.get("USERPROFILE") or str(Path.home())
+    key = api_key()
+    if key:
+        env["ANTHROPIC_API_KEY"] = key        # the CLI uses a key in preference to a login
     return env
 
 
@@ -407,8 +479,8 @@ def run_turn(text, history=()):
     claude_path = find_claude()
     if not claude_path:
         return Turn(error=(
-            "Couldn't find the Claude Code CLI (`claude`). Install it (Settings → Claude shows how), "
-            f"or set its path in {CONFIG_PATH} as {{\"claude_path\": \"/path/to/claude\"}}."))
+            "Couldn't find Claude. Paste an Anthropic API key in Settings → Claude (or install Claude Code); "
+            f"if it's installed somewhere unusual, set its path in {CONFIG_PATH} as {{\"claude_path\": \"/path/to/claude\"}}."))
 
     state = TurnState()
     try:

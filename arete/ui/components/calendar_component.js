@@ -39,10 +39,16 @@ export default function (component) {
     if (key === data.today) cls.push("today");
     if (key === data.selected) cls.push("selected");
     if (key > data.today) cls.push("future");
+    // What a screen reader says for the day, e.g. "Friday 30 October: mood 4, slept 7.5 hours, energy 3, has notes".
+    const said = [d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
+      [e.mood != null && `mood ${e.mood}`, e.sleep != null && `slept ${+e.sleep} hours`,
+       e.energy != null && `energy ${e.energy}`, e.notes && "has notes"].filter(Boolean).join(", ") || "nothing logged"]
+      .join(": ");
     const stat = (kind, value, extra = "") =>
       value == null ? "" : `<span class="stat ${kind}" ${extra}>${ICON[kind]}${esc(value)}</span>`;
     cells.push(`
-      <button class="${cls.join(" ")}" data-date="${key}">
+      <button class="${cls.join(" ")}" data-date="${key}" aria-label="${esc(said)}"
+        aria-pressed="${key === data.selected}"${key === data.today ? ' aria-current="date"' : ""}>
         <span class="num">${d.getDate()}${e.notes ? `<i class="note" title="Has notes">${ICON.note}</i>` : ""}</span>
         <span class="stats">
           ${stat("mood", e.mood, e.mood ? `style="--c:${MOOD_COLOURS[e.mood]}"` : "")}
@@ -56,9 +62,9 @@ export default function (component) {
     <div class="cal-head">
       <div class="cal-title">${title}</div>
       <div class="cal-nav">
-        <button data-nav="-1" title="Previous month">‹</button>
+        <button data-nav="-1" title="Previous month" aria-label="Previous month">‹</button>
         <button data-nav="0">Today</button>
-        <button data-nav="1" title="Next month">›</button>
+        <button data-nav="1" title="Next month" aria-label="Next month">›</button>
       </div>
       <div class="cal-key">
         <span class="stat mood" style="--c:#7cb342">${ICON.mood}mood</span>
@@ -66,7 +72,7 @@ export default function (component) {
         <span class="stat energy">${ICON.energy}energy</span>
       </div>
     </div>
-    <div class="cal-grid">
+    <div class="cal-grid" role="group" aria-label="${title}">
       ${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((n) => `<div class="dow">${n}</div>`).join("")}
       ${cells.join("")}
     </div>`;

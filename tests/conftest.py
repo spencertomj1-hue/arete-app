@@ -31,6 +31,9 @@ def no_real_outlook(tmp_path, monkeypatch):
     from arete import outlook
     monkeypatch.setattr(outlook, "CACHE", tmp_path / "outlook-cache.ics")
     monkeypatch.setattr(outlook, "keyring", MemoryKeyring())
+    from arete import assistant                  # nor a real Anthropic API key
+    monkeypatch.setattr(assistant, "keyring", MemoryKeyring())
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
 
 class MemoryKeyring:

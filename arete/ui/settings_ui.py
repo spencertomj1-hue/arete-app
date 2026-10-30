@@ -11,6 +11,7 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
+from arete import assistant
 from arete import outlook
 from arete import setup_checks
 from arete import store
@@ -24,25 +25,59 @@ STEPS = [("Welcome", ":material/waving_hand:"), ("Claude", ":material/chat:"),
 # Shared sections
 # ---------------------------------------------------------------------------
 
+KEY_WAY, CODE_WAY = "Paste an API key (easiest)", "Use my Claude subscription (Claude Code)"
+
+
 def claude_section(prefix):
-    """Is Claude Code installed and logged in? If not, how to fix it."""
+    """Is Claude ready? If not, two ways to set it up: an Anthropic API key, or Claude Code."""
     status = st.session_state.get(f"{prefix}_claude") or setup_checks.claude_status()
     st.session_state[f"{prefix}_claude"] = status
-    if status["found"] and status["logged_in"]:
-        st.success(f"Claude is ready (signed in as {status['account']}).", icon=":material/check_circle:")
+
+    def recheck():
+        st.session_state.pop(f"{prefix}_claude", None)
+
+    if status["logged_in"]:
+        how = "an Anthropic API key" if status["account"] == "API key" else f"Claude Code ({status['account']})"
+        st.success(f"Claude is ready, using {how}.", icon=":material/check_circle:")
+        if assistant.saved_api_key():
+            if st.button("Remove the API key", key=f"{prefix}_key_forget", icon=":material/key_off:"):
+                assistant.forget_api_key()
+                recheck()
+                st.rerun()
+        return
+
+    st.warning(status["note"], icon=":material/warning:")
+    way = st.radio("How should Arete talk to Claude?", [KEY_WAY, CODE_WAY], key=f"{prefix}_claude_way")
+    if way == KEY_WAY:
+        st.markdown(
+            "1. Go to [console.anthropic.com](https://console.anthropic.com), sign up or sign in, and add some credit "
+            "(Anthropic charges per message; you can set a monthly limit there).\n"
+            "2. Open **API keys** → **Create key**, and copy it.\n"
+            "3. Paste it here. It's checked with Anthropic, then kept in your "
+            f"{system.SECRET_STORE}, never in a file."
+        )
+        with st.form(f"{prefix}_key_form", clear_on_submit=True, border=False):
+            key = st.text_input("Anthropic API key", type="password", placeholder="sk-ant-…")
+            if st.form_submit_button("Save key", icon=":material/key:") and key.strip():
+                ok, message = assistant.check_api_key(key)
+                if ok:
+                    assistant.save_api_key(key)
+                    recheck()
+                    st.rerun()
+                st.error(message, icon=":material/error:")
     else:
-        st.warning(status["note"], icon=":material/warning:")
-        st.markdown("The chat bar uses **Claude Code**, Anthropic's command-line app, with your Claude account. "
-                    f"Open the **{setup_checks.SHELL}** app and run these one at a time (use the copy button on each):")
+        st.markdown("If you pay for Claude (Pro or Max), Arete can use that through **Claude Code**, Anthropic's "
+                    f"command-line app. Open **{setup_checks.SHELL}** and run these one at a time (use the copy "
+                    "button on each):")
         if not status["found"]:
             st.markdown("**1. Install Claude Code**")
             st.code(setup_checks.INSTALL_CMD, language="powershell" if system.IS_WINDOWS else "bash")
         st.markdown(f"**{'2' if not status['found'] else '1'}. Sign in** (opens your browser)")
         st.code(setup_checks.LOGIN_CMD, language="bash")
-        st.caption("Then come back here and press Check again. Everything else in Arete works without this.")
-    if st.button("Check again", key=f"{prefix}_claude_check", icon=":material/refresh:"):
-        st.session_state.pop(f"{prefix}_claude", None)
-        st.rerun()
+        if st.button("Check again", key=f"{prefix}_claude_check", icon=":material/refresh:"):
+            recheck()
+            st.rerun()
+    st.caption("Everything else in Arete works without Claude.")
 
 
 def outlook_guide(prefix):

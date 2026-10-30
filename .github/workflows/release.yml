@@ -1,0 +1,171 @@
+# Builds the downloadable apps, each on its own system:
+#   Windows: Arete-Setup.exe  (PyInstaller bundle -> Inno Setup installer, packaging/arete.iss)
+#   macOS:   Arete.dmg        (PyInstaller Arete.app -> disk image; Apple silicon Macs)
+# Each build is smoke-tested (the bundle imports everything, and its server starts and
+# answers) and kept as a download on the run's page. For a release, both are attached
+# to a GitHub Release.
+#
+# Make a release: Actions -> "Installers" -> Run workflow, with a version and
+# "publish" ticked. (Pushing a tag like v1.1.0 does the same.)
+name: Installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, e.g. 1.1.0"
+        required: true
+      publish:
+        description: "Publish a GitHub Release with the installers"
+        type: boolean
+        default: false
+  push:
+    tags: ["v*"]
+    branches: ["windows-installer", "accessibility"]     # test builds while the installers are worked on
+  pull_request:
+    paths: ["packaging/**", "desktop.py", "requirements.txt", ".github/workflows/release.yml"]
+
+permissions:
+  contents: write          # to create the release
+
+env:
+  VERSION_INPUT: ${{ inputs.version }}
+
+jobs:
+  windows:
+    if: ${{ !github.event.repository.private }}   # public repo only (private Actions minutes are limited)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Work out the version
+        shell: pwsh
+        run: |
+          $v = $env:VERSION_INPUT
+          if (-not $v -and "${{ github.ref_type }}" -eq "tag") { $v = "${{ github.ref_name }}".TrimStart("v") }
+          if (-not $v) { $v = "0.0.0" }
+          "ARETE_VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt "pyinstaller>=6.11,<7"
+
+      - name: Bundle with PyInstaller
+        run: pyinstaller packaging/arete.spec --noconfirm --distpath dist --workpath build
+
+      - name: "Smoke test: everything imports"
+        shell: pwsh
+        run: |
+          $env:ARETE_DATA_DIR = Join-Path $env:RUNNER_TEMP "arete-check"
+          $p = Start-Process dist\Arete\Arete.exe -ArgumentList "--check" -Wait -PassThru
+          Get-Content (Join-Path $env:ARETE_DATA_DIR "logs\arete.log") -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "Arete.exe --check failed ($($p.ExitCode))" }
+
+      - name: "Smoke test: the server starts"
+        shell: pwsh
+        run: |
+          $env:ARETE_DATA_DIR = Join-Path $env:RUNNER_TEMP "arete-serve"
+          $p = Start-Process dist\Arete\Arete.exe -ArgumentList "--serve", "8765" -PassThru
+          $ok = $false
+          foreach ($i in 1..60) {
+            try {
+              $r = Invoke-WebRequest "http://127.0.0.1:8765/_stcore/health" -UseBasicParsing -TimeoutSec 2
+              if ($r.Content -eq "ok") { $ok = $true; break }
+            } catch {}
+            Start-Sleep -Seconds 2
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          Get-Content (Join-Path $env:ARETE_DATA_DIR "logs\arete.log") -ErrorAction SilentlyContinue | Select-Object -Last 40
+          if (-not $ok) { throw "The bundled server didn't start" }
+
+      - name: Build the installer (Inno Setup)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) { choco install innosetup --no-progress -y }
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\arete.iss
+          Get-Item dist\Arete-Setup.exe | Select-Object Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/Arete-Setup.exe
+
+  mac:
+    if: ${{ !github.event.repository.private }}   # public repo only (private Actions minutes are limited)
+    runs-on: macos-latest          # Apple silicon
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Work out the version
+        run: |
+          v="$VERSION_INPUT"
+          if [ -z "$v" ] && [ "${{ github.ref_type }}" = "tag" ]; then v="${GITHUB_REF_NAME#v}"; fi
+          echo "ARETE_VERSION=${v:-0.0.0}" >> "$GITHUB_ENV"
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt "pyinstaller>=6.11,<7"
+
+      - name: Bundle with PyInstaller
+        run: pyinstaller packaging/arete.spec --noconfirm --distpath dist --workpath build
+
+      - name: "Smoke test: everything imports"
+        run: |
+          export ARETE_DATA_DIR="$RUNNER_TEMP/arete-check"
+          dist/Arete.app/Contents/MacOS/Arete --check
+
+      - name: "Smoke test: the server starts"
+        run: |
+          export ARETE_DATA_DIR="$RUNNER_TEMP/arete-serve"
+          dist/Arete.app/Contents/MacOS/Arete --serve 8765 > "$RUNNER_TEMP/serve.log" 2>&1 &
+          pid=$!
+          for i in $(seq 1 60); do
+            if [ "$(curl -s http://127.0.0.1:8765/_stcore/health)" = "ok" ]; then ok=1; break; fi
+            sleep 2
+          done
+          kill $pid || true
+          tail -40 "$RUNNER_TEMP/serve.log"
+          [ -n "$ok" ] || { echo "The bundled server didn't start"; exit 1; }
+
+      - name: Make the disk image
+        run: |
+          mkdir dmg
+          cp -R dist/Arete.app dmg/
+          ln -s /Applications dmg/Applications        # drag Arete onto this to install
+          hdiutil create -volname Arete -srcfolder dmg -ov -format UDZO dist/Arete.dmg
+          ls -lh dist/Arete.dmg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: dist/Arete.dmg
+
+  release:
+    needs: [windows, mac]
+    if: inputs.publish || github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          v="$VERSION_INPUT"
+          if [ -z "$v" ]; then v="${GITHUB_REF_NAME#v}"; fi
+          notes="**Windows:** download **Arete-Setup.exe** and run it. Windows may say \"Windows protected your PC\" because the installer isn't code-signed: click **More info**, then **Run anyway**.
+
+          **Mac (Apple silicon):** download **Arete.dmg**, open it and drag Arete into Applications. The first time, macOS will say it can't check the app for malicious software because it isn't notarised: open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
+
+          Your data stays on your computer. To use the chat, paste an Anthropic API key in Settings → Claude (or sign in to Claude Code)."
+          gh release create "v$v" windows/Arete-Setup.exe mac/Arete.dmg --target "$GITHUB_SHA" --title "Arete v$v" --notes "$notes"

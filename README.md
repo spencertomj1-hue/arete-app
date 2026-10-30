@@ -124,11 +124,19 @@ Claude only changes Arete's data, through a fixed set of actions. **Anything tha
 - **Python 3.13.** Install it from [python.org](https://www.python.org/downloads/) (on Windows, tick **Add python.exe to PATH**), or on a Mac with Homebrew: `brew install python@3.13`.
 - **Git**, to download Arete: built into macOS; on Windows, install it from [git-scm.com](https://git-scm.com/download/win).
 - **About 2 GB of free disk space:** roughly 1 GB for the packages, plus about 470 MB for the speech model the first time you use the microphone.
-- **Optional, for the chat:** [Claude Code](https://docs.claude.com/en/docs/claude-code) signed in with your own Claude account, **or** your own `ANTHROPIC_API_KEY`.
+- **Optional, for the chat:** an [Anthropic API key](https://console.anthropic.com) (paste it in Settings → Claude), **or** [Claude Code](https://docs.claude.com/en/docs/claude-code) signed in with your own Claude account.
 
 ## Install
 
-### Mac
+### The easy way: download it
+
+Go to [Releases](https://github.com/spencertomj1-hue/arete-app/releases/latest) and download:
+- **Windows:** `Arete-Setup.exe`. Run it. Windows may say "Windows protected your PC" because it isn't code-signed: click **More info → Run anyway**.
+- **Mac (Apple silicon):** `Arete.dmg`. Open it and drag Arete into Applications. The first time, macOS says it can't check the app: open **System Settings → Privacy & Security** and click **Open Anyway**.
+
+Nothing else to install. For the chat, paste an Anthropic API key in **Settings → Claude** (or sign in to Claude Code).
+
+### From the source code (Mac)
 
 Open the **Terminal** app and run:
 
@@ -147,7 +155,7 @@ It's safe to run again, for example after `git pull`.
 
 Then open **Arete** from Applications, Launchpad or Spotlight. The first time, macOS may say it's from an unidentified developer: right-click Arete → **Open** → **Open**.
 
-### Windows
+### From the source code (Windows)
 
 Open **PowerShell** and run:
 
@@ -164,7 +172,7 @@ powershell -ExecutionPolicy Bypass -File .\setup.ps1
 A short setup guide appears the first time. Every step can be skipped, and you can rerun it from **Settings → About**.
 
 1. **Welcome:** what Arete does, and where your data lives.
-2. **Claude:** checks whether Claude Code is installed and signed in. If it isn't, it shows the two commands to run, with copy buttons. Everything else works without it.
+2. **Claude:** the chat needs one of: an **Anthropic API key** (paste it in; easiest, nothing to install), or **Claude Code** signed in with your Claude subscription (it shows the commands, with copy buttons). Everything else works without it.
 3. **Outlook calendar (optional):** see below.
 4. **Microphone:** explains the microphone permission prompt and lets you test the mic.
 

@@ -155,7 +155,8 @@ Two different things:
 
 ## 7. Claude chat (`assistant.py`, `tools.py`, `chat.py`)
 
-- **The agent:** `claude_agent_sdk.query` drives the local `claude` CLI. It uses the user's Claude Code login, or `ANTHROPIC_API_KEY` if set.
+- **The agent:** `claude_agent_sdk.query` drives the `claude` CLI: the user's installed Claude Code if `find_claude()` finds one, otherwise the copy bundled inside the SDK (`bundled_claude()`).
+- **Signing in:** an Anthropic API key (pasted in the wizard/Settings, checked with Anthropic's free `GET /v1/models`, stored with `keyring` as service `Arete`, account `anthropic-api-key`; or `$ANTHROPIC_API_KEY`) is passed to the CLI as `ANTHROPIC_API_KEY`, which it prefers over a login. Otherwise the user's Claude Code login is used. `setup_checks.claude_status()` reports which.
 - **Isolation:**
   - `tools=[]` (no built-in tools) and `allowed_tools` = only `mcp__arete__*`, with `permission_mode="dontAsk"`.
   - `setting_sources=[]`, `strict_mcp_config=True` and `skills=[]`, so the user's own Claude config isn't loaded.
@@ -182,10 +183,18 @@ Two different things:
 - **Global CSS first:** `app.py` sends all global CSS as its first element (top padding, sidebar nav, no stale-element dimming, and hiding the marker's gap). Pages must not inject their own top padding.
 - **Toolbar:** `.streamlit/config.toml` sets `client.toolbarMode = "minimal"`, along with `server.address = 127.0.0.1`, XSRF protection and no usage statistics.
 
+## 8b. Installers (`packaging/`, `.github/workflows/release.yml`)
+
+- **One PyInstaller recipe** (`packaging/arete.spec`) builds `dist/Arete/Arete.exe` on Windows and `dist/Arete.app` on macOS, with Python and every package inside. `app.py`, `.streamlit/config.toml`, `assets/` and the components are data files; `collect_all` picks up packages with data/plugins (Streamlit, Plotly, keyring, pywebview, the SDK with its bundled CLI, faster-whisper…).
+- **The bundle runs itself twice:** the window process starts a copy of itself with `--serve PORT`, which runs Streamlit in-process (`desktop.serve`). `--check` imports every module and sets up a throwaway database. A windowed `.exe` has no console, so output goes to `<data folder>/logs/arete.log`.
+- **The workflow** builds both on GitHub's runners, smoke-tests each (`--check`, then `--serve` and `/_stcore/health`), makes `Arete-Setup.exe` (Inno Setup, `packaging/arete.iss`: per-user, no admin, Start menu + optional desktop shortcut) and `Arete.dmg` (`hdiutil`, drag to Applications), and keeps both as downloads on the run. Run it from the Actions tab with a version and "publish" (or push a `v*` tag) to make a GitHub Release with both attached.
+- **Not signed:** Windows shows SmartScreen ("More info → Run anyway"); macOS needs "Open Anyway" in Privacy & Security. Signing needs paid certificates (Apple Developer ID, a Windows code-signing certificate). The Mac build is Apple silicon only (`macos-latest`).
+
 ## 9. Gotchas
 
 - **Always read and write text files as UTF-8** (`read_text(encoding="utf-8")`). Windows defaults to cp1252, which garbles the components' `›`, `…`, `×` etc.
 - **No `%-d` (or other `%-x`) in Python date formats:** Windows' `strftime` doesn't support them. Use `x.day` instead. (Plotly's `tickformat` is fine; it runs in the browser.)
+- **Accessibility in the components:** the custom parts are keyboard-usable and labelled: to-do titles are focusable (Enter edits, Menu key / Shift+F10 opens the menu, Alt+↑/↓ reorders), the timetable has a hidden-until-focused list of its blocks (`renderBlockList`), network circles are focusable buttons. Keep new interactive bits focusable with an `aria-label`, and keep focus where it was across redraws.
 - **OS differences go in `arete/system.py`** (data folder, opening folders, UI words), so the rest of the code stays the same everywhere.
 
 - **The sidebar radio has `key="page"`.** Home's "See all" sets it from a component callback, which runs before the radio is drawn; don't set it anywhere after that.
