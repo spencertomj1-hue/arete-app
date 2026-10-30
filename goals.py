@@ -15,7 +15,7 @@ import store
 
 HERE = Path(__file__).parent
 
-PAGE = ":material/checklist: Goals"          # sidebar label (also what "See all" switches to)
+PAGE = "Goals"                               # sidebar label (also what "See all" switches to)
 NAMES = {"daily": "Daily", "weekly": "Weekly", "monthly": "Monthly", "yearly": "Yearly"}
 HOME_PERIODS = ("daily", "weekly", "monthly")
 HOME_LIMIT = 6                                # goals shown per Home card before "N more"
