@@ -1,5 +1,6 @@
 """Platform differences (arete/system.py and the Claude CLI search), faked for each system."""
 
+import os
 from pathlib import Path
 
 from arete import system
@@ -43,7 +44,9 @@ def test_claude_env_paths(monkeypatch, store):
     monkeypatch.setenv("PATH", "/usr/bin")
     as_system(monkeypatch, "mac")
     env = assistant._env("/somewhere/claude")
-    assert env["PATH"].split(":")[:2] == ["/somewhere", "/opt/homebrew/bin"] and "USERPROFILE" not in env
+    first, second = env["PATH"].split(os.pathsep)[:2]
+    assert first == str(Path("/somewhere/claude").parent) and second == "/opt/homebrew/bin"
+    assert "USERPROFILE" not in env
     as_system(monkeypatch, "windows")
     env = assistant._env(str(Path("C:/Users/x/.local/bin/claude.exe")))
     assert "/opt/homebrew/bin" not in env["PATH"] and env["USERPROFILE"]

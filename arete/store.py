@@ -3,7 +3,7 @@ Data layer for Arete: every SQL query lives here. No Streamlit code, so the
 pages, the Claude tools and the tests all share the same logic.
 
 All user data lives in the data folder (system.default_data_dir(): ~/Library/Application Support/Arete
-on a Mac, %APPDATA%\Arete on Windows, ~/.local/share/Arete on Linux), or $ARETE_DATA_DIR, used for tests and the demo). The database is life.db
+on a Mac, %APPDATA%/Arete on Windows, ~/.local/share/Arete on Linux), or $ARETE_DATA_DIR, used for tests and the demo). The database is life.db
 there (or $ARETE_DB). Backups, settings.json and the Outlook cache live there
 too. Nothing user-specific is kept in the project folder.
 """

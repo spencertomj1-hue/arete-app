@@ -1,7 +1,9 @@
 """Setup wizard and Settings: link checks, connecting, Keychain, Claude status, backups, the wizard flow."""
 
 import importlib
+import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -76,14 +78,20 @@ def test_claude_status(store, tmp_path, monkeypatch):
     monkeypatch.setattr(assistant, "find_claude", lambda: None)
     assert setup_checks.claude_status()["found"] is False
 
-    fake = tmp_path / "claude"
-    fake.write_text('#!/bin/sh\necho \'{"loggedIn": false}\'\n')
-    fake.chmod(0o755)
-    monkeypatch.setattr(assistant, "find_claude", lambda: str(fake))
+    # A found CLI; what `claude auth status --json` prints is faked, so this works on every OS.
+    answer = {}
+
+    def fake_run(args, **kwargs):
+        assert args[1:] == ["auth", "status", "--json"]
+        return subprocess.CompletedProcess(args, 0, stdout=json.dumps(answer), stderr="")
+
+    monkeypatch.setattr(assistant, "find_claude", lambda: str(tmp_path / "claude"))
+    monkeypatch.setattr(setup_checks.subprocess, "run", fake_run)
+    answer.update(loggedIn=False)
     status = setup_checks.claude_status()
     assert status["found"] and not status["logged_in"]
 
-    fake.write_text('#!/bin/sh\necho \'{"loggedIn": true, "email": "me@example.com"}\'\n')
+    answer.update(loggedIn=True, email="me@example.com")
     assert setup_checks.claude_status()["account"] == "me@example.com"
 
 

@@ -153,7 +153,7 @@ def render_home_habits():
         tick.checkbox(name, value=d in done, key=key, on_change=_toggle_habit, args=(habit_id, d, key))
         cells = "".join(
             f'<i class="{"on" if x.isoformat() in done else ""}{" today" if x == today else ""}" '
-            f'title="{x:%a %-d %b}"></i>' for x in days)
+            f'title="{x:%a} {x.day} {x:%b}"></i>' for x in days)
         week.html(f'<div class="hb-week" title="Last 7 days">{cells}</div>')
         streak.caption(f":material/local_fire_department: {current}" if current else "–")   # current streak
 

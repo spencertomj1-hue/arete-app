@@ -185,6 +185,7 @@ Two different things:
 ## 9. Gotchas
 
 - **Always read and write text files as UTF-8** (`read_text(encoding="utf-8")`). Windows defaults to cp1252, which garbles the components' `›`, `…`, `×` etc.
+- **No `%-d` (or other `%-x`) in Python date formats:** Windows' `strftime` doesn't support them. Use `x.day` instead. (Plotly's `tickformat` is fine; it runs in the browser.)
 - **OS differences go in `arete/system.py`** (data folder, opening folders, UI words), so the rest of the code stays the same everywhere.
 
 - **The sidebar radio has `key="page"`.** Home's "See all" sets it from a component callback, which runs before the radio is drawn; don't set it anywhere after that.
