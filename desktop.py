@@ -30,6 +30,21 @@ SPLASH_SECONDS = 2.0                     # minimum time the loading screen shows
 READY_TIMEOUT = 45                       # give up waiting for the page after this (it shows anyway)
 
 
+def _data_dir():
+    from arete import system
+    return Path(os.environ.get("ARETE_DATA_DIR") or system.default_data_dir())
+
+
+def _window_colour():
+    """The window's colour before the page draws: dark if Arete is set to dark mode, so it doesn't flash white."""
+    import json
+    try:
+        theme = json.loads((_data_dir() / "settings.json").read_text(encoding="utf-8")).get("theme")
+    except (OSError, ValueError):
+        theme = None
+    return "#0E1117" if theme == "Dark" else "#FFFFFF"
+
+
 def splash_html():
     """splash.html with the logo embedded, so it shows before the server is up."""
     logo = base64.b64encode(SPLASH_LOGO.read_bytes()).decode()
@@ -160,7 +175,7 @@ def main():
 
         app = webview.create_window(
             "Arete", f"http://127.0.0.1:{port}", width=1200, height=850,
-            hidden=True, background_color="#FFFFFF",
+            hidden=True, background_color=_window_colour(),
         )
         app.events.closed += stop_server
         state["app"] = app
@@ -205,7 +220,9 @@ def main():
         )
         splash.events.closed += splash_closed
         set_dock_icon()
-        webview.start(show_app, splash)  # blocks until every window is closed
+        # Not private: the window keeps its browser storage (e.g. the light/dark choice) between launches.
+        webview.start(show_app, splash, private_mode=False,
+                      storage_path=str(_data_dir() / "webview"))  # blocks until every window is closed
     finally:
         stop_server()
 

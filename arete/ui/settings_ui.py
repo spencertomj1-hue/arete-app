@@ -294,16 +294,30 @@ def reminders_section():
             st.error(f"Couldn't show a notification on this {system.COMPUTER}.")
 
 
+def appearance_section():
+    from arete.ui import appearance
+    st.subheader("Appearance")
+    current = appearance.mode()
+    picked = st.segmented_control("Theme", appearance.MODES, default=current, key="set_theme",
+                                  help="System follows your computer's light or dark mode.")
+    if picked and picked != current:
+        appearance.set_mode(picked)
+        st.rerun()                               # the sync script then switches the theme
+
+
 def page_settings():
     st.header("Settings")
     ai = store.ai_enabled()
-    names = [":material/calendar_month: Calendar", ":material/chat: Assistant",
+    names = [":material/palette: Appearance", ":material/calendar_month: Calendar", ":material/chat: Assistant",
              ":material/notifications: Reminders", ":material/database: Data", ":material/info: About"]
     if ai:
-        names.insert(2, ":material/mic: Voice")       # voice input is for the assistant
-    tabs = dict(zip(["cal", "claude", "mic", "remind", "data", "about"] if ai else
-                    ["cal", "claude", "remind", "data", "about"], st.tabs(names)))
-    cal, claude, mic, remind, data, about = (tabs.get(k) for k in ("cal", "claude", "mic", "remind", "data", "about"))
+        names.insert(3, ":material/mic: Voice")       # voice input is for the assistant
+    tabs = dict(zip(["look", "cal", "claude", "mic", "remind", "data", "about"] if ai else
+                    ["look", "cal", "claude", "remind", "data", "about"], st.tabs(names)))
+    look, cal, claude, mic, remind, data, about = (
+        tabs.get(k) for k in ("look", "cal", "claude", "mic", "remind", "data", "about"))
+    with look:
+        appearance_section()
     with cal:
         st.subheader("Outlook calendar")
         connected = calendar_status("set")

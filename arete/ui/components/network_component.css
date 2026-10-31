@@ -96,9 +96,8 @@ button { cursor: pointer; }
 
 .nw-empty {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-content: center;
+  left: 0; right: 0; top: 16%;   /* above the "You" circle in the middle, not on it */
+  margin: 0 auto; max-width: 460px;
   padding: 24px;
   text-align: center;
   color: var(--muted);

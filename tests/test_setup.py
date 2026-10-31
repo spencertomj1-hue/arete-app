@@ -201,3 +201,14 @@ def test_wizard_without_the_assistant(store):
     at.sidebar.radio[0].set_value("Settings").run()
     at.toggle(key="set_ai_on").set_value(True).run()             # switched on later in Settings
     assert setup_checks.load_settings()["ai_enabled"] is True and not at.exception
+
+
+def test_appearance_setting(store):
+    from arete.ui import appearance
+    assert appearance.mode() == "System"
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at.sidebar.radio[0].set_value("Settings").run()
+    at.segmented_control(key="set_theme").set_value("Dark").run()
+    assert not at.exception and store.load_settings()["theme"] == "Dark" and appearance.mode() == "Dark"
+    store.save_settings(theme="Purple")                         # anything odd falls back to System
+    assert appearance.mode() == "System"

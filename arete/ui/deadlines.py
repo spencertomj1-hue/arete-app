@@ -33,6 +33,8 @@ def render_home():
     if not rows:
         st.caption("No deadlines. Add them on the Goals page.")
         return
+    from arete.ui import appearance
+    soon, over = appearance.warn_colours()
     items = "".join(
         f'<div class="dl-row {_tone(d["due"], today)}"><span class="dl-title">{escape(d["title"])}</span>'
         f'<span class="dl-when">{store.countdown(d["due"], today)}</span></div>' for d in rows[:HOME_LIMIT])
@@ -42,8 +44,8 @@ def render_home():
       .dl-row {{ display: flex; gap: 8px; align-items: baseline; }}
       .dl-title {{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
       .dl-when {{ margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; opacity: 0.8; }}
-      .dl-row.soon .dl-when {{ color: #b45309; opacity: 1; font-weight: 600; }}
-      .dl-row.over .dl-when {{ color: #c62828; opacity: 1; font-weight: 600; }}
+      .dl-row.soon .dl-when {{ color: {soon}; opacity: 1; font-weight: 600; }}
+      .dl-row.over .dl-when {{ color: {over}; opacity: 1; font-weight: 600; }}
       .dl-more {{ opacity: 0.7; font-size: 0.8rem; }}
     </style><div class="dl">{items}{more}</div>""")
 

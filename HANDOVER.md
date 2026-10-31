@@ -54,6 +54,7 @@ arete/                         The app's code, as a package (imported as `from a
     network.py                 Network page: the web's Python side, plus the add / edit dialogs (incl. the interaction log)
     chat.py                    The chat bar / Home ask box, and its flow (send → transcribe → Claude → rerun)
     settings_ui.py             First-run wizard and the Settings page
+    appearance.py              Light / dark / system: syncs settings.json "theme" into Streamlit's own theme choice (localStorage), is_dark()
     sidebar_theme.py           The sidebar's look: marble background, no title, narrow, a box per menu item
     components/                Front ends (Streamlit components v2, shadow root), read once at import:
       timetable_component.*    the week/day grid

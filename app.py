@@ -209,6 +209,8 @@ st.html(f"""<style>
 
 
 from arete.ui import sidebar_theme          # the marble sidebar and its boxed menu
+from arete.ui import appearance             # light / dark / system
+appearance.sync()
 sidebar_theme.apply()
 
 
