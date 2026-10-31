@@ -45,6 +45,8 @@ arete/                         The app's code, as a package (imported as `from a
   voice.py                     Microphone recording (sounddevice) and local transcription (faster-whisper)
   outlook.py                   Read-only Outlook import: link checks, Keychain, fetch, recurrence expansion, sync
   notify.py                    Reminders: a background thread that notifies before Plan blocks / Outlook events start
+  updates.py                   Daily check of GitHub's latest release vs arete/VERSION (written by packaging/arete.spec; none = "dev", not checked); banner in app.py
+  undo.py                      Undo: whole-database snapshot before deletes / overwrites (ui/undo_bar.py offers it)
   setup_checks.py              Logic behind the wizard/Settings: Claude status, mic test, backups, Finder
   ui/                          One module per page or section (imported as `from arete.ui import goals`, ...)
     timetable.py               Timetable page and the week/day grid's Python side

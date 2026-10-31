@@ -94,6 +94,8 @@ Claude only changes Arete's data, through a fixed set of actions. **Anything tha
 
 **Outlook calendar (optional).** Your published Outlook calendar appears in the timetable's Plan column, and you can remove or adjust any event. It's read only: nothing is ever written back to Outlook.
 
+**Updates.** The installed app checks once a day whether a newer version is out and, if so, shows a banner with a download link (Settings → About to turn it off or check now).
+
 **Undo.** Delete or overwrite something (a block, a to-do, a goal, a deadline, a person, a habit, an import...) and a bar at the bottom says what happened, with **Undo**, for two minutes.
 
 **Settings.**
@@ -231,18 +233,19 @@ Claude can only use Arete's own actions: logging days, ticking habits, editing t
 - **The app itself:** it only listens on `127.0.0.1` (this computer), with XSRF protection on and Streamlit's usage statistics off.
 
 **What leaves your computer:**
-- **Messages to Claude:** when you use the chat, your message, the recent conversation and whatever data Claude looks up to answer it (for example that week's timetable) go to Anthropic through your Claude Code login or API key, like any Claude conversation.
+- **Messages to Claude (only if you switch the assistant on):** when you use the chat, your message, the recent conversation and whatever data Claude looks up to answer it (for example that week's timetable) go to Anthropic through your Claude Code login or API key, like any Claude conversation.
 - **Calendar fetch:** if you connect Outlook, Arete downloads your published calendar from Microsoft.
+- **Update check (installed app, once a day; turn it off in Settings → About):** a plain request to GitHub for the latest release's version number. Nothing about you is sent.
 
 Nothing else is sent anywhere.
 
 ## Limitations
 
 - **Mac and Windows.** Windows support is new: the tests run on Windows, but report anything odd in Issues. Linux should work from a terminal (`.venv/bin/python desktop.py`) but has no installer yet.
-- **The chat needs your own Claude access:** a Claude Code login or an Anthropic API key.
+- **The (optional) chat needs your own Claude access:** a Claude Code login or an Anthropic API key.
 - **Outlook publishing may be blocked.** Some universities and workplaces turn off "Publish a calendar". If the option is missing, or Outlook refuses the link, ask your IT team.
 - **Single user, single computer.** There's no sync between devices.
-- **Timetable hours:** the grid covers 07:00–01:00. Events outside those hours are clipped.
+- **Timetable hours:** the grid covers 07:00–01:00 unless you change it (Settings → Region). Outlook events outside the hours are clipped.
 
 ## Troubleshooting
 
