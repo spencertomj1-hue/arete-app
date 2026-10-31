@@ -21,6 +21,7 @@ from arete.ui import network
 from arete.ui import journal
 from arete.ui import settings_ui
 from arete import store
+from arete import notify
 from arete.ui import timetable
 from arete.store import entries_between, get_stats, init_db
 
@@ -214,6 +215,7 @@ def ready_marker():
 
 
 init_db()
+notify.start()      # desktop reminders before blocks start (once per process)
 
 # First run (or reopened from Settings): the setup wizard instead of the app.
 if settings_ui.needs_wizard():

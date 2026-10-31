@@ -34,6 +34,7 @@ def no_real_outlook(tmp_path, monkeypatch):
     from arete import assistant                  # nor a real Anthropic API key
     monkeypatch.setattr(assistant, "keyring", MemoryKeyring())
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("ARETE_NO_REMINDERS", "1")     # no reminder thread popping up real notifications
 
 
 class MemoryKeyring:

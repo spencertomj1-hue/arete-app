@@ -245,11 +245,31 @@ def wizard():
 # Settings page
 # ---------------------------------------------------------------------------
 
+def reminders_section():
+    """Desktop notifications before Plan blocks and Outlook events (arete/notify.py)."""
+    from arete import notify
+    on, minutes = notify.settings()
+    st.write(f"A notification on your {system.COMPUTER} shortly before each block in your Plan "
+             "(and each Outlook event) starts, while Arete is open.")
+    new_on = st.toggle("Remind me before blocks start", value=on, key="remind_on")
+    new_minutes = st.number_input("Minutes before", 0, 60, minutes, step=1, key="remind_minutes",
+                                  disabled=not new_on, help="0 = when the block starts.")
+    if (new_on, new_minutes) != (on, minutes):
+        store.save_settings(reminders=new_on, reminder_minutes=int(new_minutes))
+        st.toast("Saved", icon=":material/check_circle:")
+    if st.button("Send a test notification", icon=":material/notifications_active:"):
+        if system.notify("Arete", "Reminders are working."):
+            st.success("Sent. If nothing popped up, check your system's notification settings"
+                       + (" (System Settings → Notifications → Script Editor)." if system.IS_MAC else "."))
+        else:
+            st.error(f"Couldn't show a notification on this {system.COMPUTER}.")
+
+
 def page_settings():
     st.header("Settings")
-    cal, claude, mic, data, about = st.tabs([
+    cal, claude, mic, remind, data, about = st.tabs([
         ":material/calendar_month: Calendar", ":material/chat: Claude", ":material/mic: Voice",
-        ":material/database: Data", ":material/info: About",
+        ":material/notifications: Reminders", ":material/database: Data", ":material/info: About",
     ])
     with cal:
         st.subheader("Outlook calendar")
@@ -265,6 +285,9 @@ def page_settings():
     with mic:
         st.subheader("Voice input")
         mic_section("set")
+    with remind:
+        st.subheader("Reminders")
+        reminders_section()
     with data:
         _data_section()
     with about:
