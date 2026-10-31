@@ -76,7 +76,7 @@ PAGE = "Daily Log"      # sidebar label (also what Home's habits "Manage" switch
 
 
 def page_daily_log():
-    st.header("Daily Log")
+    st.header("Daily Log", anchor=False)
     today = date.today()
     selected = st.session_state.setdefault("log_day", today)
     month = st.session_state.setdefault("log_month", today.replace(day=1))
@@ -99,7 +99,7 @@ def page_daily_log():
     d = selected.isoformat()
     entry = store.get_entry(d)
     with st.container(border=True):
-        st.subheader(nice_date(selected))
+        st.subheader(nice_date(selected), anchor=False)
         if entry:
             a, b, c, w = st.columns(4)
             a.metric("Mood", f"{entry['mood']}/5" if entry.get("mood") else "–")
@@ -116,7 +116,7 @@ def page_daily_log():
     if selected > today:
         st.info("You can't log a day that hasn't happened yet. Pick today or an earlier day.")
         return
-    st.subheader("Save entry")
+    st.subheader("Save entry", anchor=False)
     # Widget keys include the date, so the form reloads when you pick another day, and a hash of the
     # saved entry, so it shows what Claude just wrote instead of a stale draft.
     v = f"{d}_{hashlib.sha1(repr(sorted(entry.items())).encode('utf-8')).hexdigest()[:8]}"
@@ -221,7 +221,7 @@ OFTEN = ["Every day"] + [f"{n} time{'s' * (n > 1)} a week" for n in range(1, 8)]
 
 def _habits_for(day, today):
     """The selected day's habits to tick (not for future days), with streaks, and adding/removing habits."""
-    st.subheader("Habits")
+    st.subheader("Habits", anchor=False)
     d = day.isoformat()
     habits = store.get_habits()
     if not habits:

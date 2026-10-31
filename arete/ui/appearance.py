@@ -71,10 +71,19 @@ def apply_text_size():
 def apply_text_colours():
     """Streamlit's captions are 60% text colour (3.7:1 on white); make them 4.5:1+ in either mode."""
     caption = "#A3A8B8" if is_dark() else "#5F6170"
+    ring = accent()
     st.html(f"""<style>
+    /* Keyboard focus is always visible (Streamlit's own controls draw theirs; this covers the rest). */
+    section[data-testid="stMain"]:focus-visible {{ outline: 2px solid {ring}; outline-offset: -4px; }}
+    a:focus-visible, [tabindex]:focus-visible, summary:focus-visible {{ outline: 2px solid {ring}; outline-offset: 2px; }}
     [data-testid="stCaptionContainer"] {{ opacity: 1 !important; }}
     [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {{ color: {caption} !important; }}
     </style>""")
+
+
+def accent():
+    """The accent colour actually in use (it differs between light and dark, see .streamlit/config.toml)."""
+    return "#FF6B6B" if is_dark() else "#C62828"
 
 
 def warn_colours():

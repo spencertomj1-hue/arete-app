@@ -194,7 +194,7 @@ def _group_dialog(group_id):
 
 def render_page():
     head, add_person, add_group = st.columns([4, 1, 1], vertical_alignment="bottom")
-    head.header("Network")
+    head.header("Network", anchor=False)
     if add_person.button("Add someone", icon=":material/person_add:", width="stretch"):
         _new_person_dialog()
     if add_group.button("Add group", icon=":material/workspaces:", width="stretch"):

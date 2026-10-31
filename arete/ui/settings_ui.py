@@ -227,7 +227,7 @@ def wizard():
         st.caption(f"Setup · step {step + 1} of {len(STEPS)}")
         st.progress((step + 1) / len(STEPS))
         if step == 0:
-            st.title("Welcome to Arete")
+            st.title("Welcome to Arete", anchor=False)
             st.markdown(
                 "Arete keeps track of your days:\n\n"
                 "- :material/calendar_view_week: a **timetable** of what you planned and what you actually did\n"
@@ -239,20 +239,20 @@ def wizard():
                 "anything and set it up later in **Settings**."
             )
         elif step == 1:
-            st.header(f"{icon} Claude assistant (optional)")
+            st.header(f"{icon} Claude assistant (optional)", anchor=False)
             st.markdown(AI_PITCH)
             if ai_switch("wiz"):
                 claude_section("wiz")
         elif step == 2:
-            st.header(f"{icon} Outlook calendar (optional)")
+            st.header(f"{icon} Outlook calendar (optional)", anchor=False)
             st.markdown("Show your Outlook events (classes, meetings) in the timetable. Arete only reads them.")
             if not calendar_status("wiz"):
                 outlook_guide("wiz")
         elif step == 3:
-            st.header(f"{icon} Microphone")
+            st.header(f"{icon} Microphone", anchor=False)
             mic_section("wiz")
         else:
-            st.title("You're all set")
+            st.title("You're all set", anchor=False)
             st.markdown("Arete opens on **Home**: today's agenda and timetable, your to-dos, habits and goals"
                         + (", and the box to ask Claude" if store.ai_enabled() else "") + ". "
                         "Everything from this setup is in **Settings** if you want to change it"
@@ -297,7 +297,7 @@ def reminders_section():
 
 def appearance_section():
     from arete.ui import appearance
-    st.subheader("Appearance")
+    st.subheader("Appearance", anchor=False)
     current = appearance.mode()
     picked = st.segmented_control("Theme", appearance.MODES, default=current, key="set_theme",
                                   help="System follows your computer's light or dark mode.")
@@ -313,7 +313,7 @@ def appearance_section():
 
 
 def page_settings():
-    st.header("Settings")
+    st.header("Settings", anchor=False)
     ai = store.ai_enabled()
     names = [":material/palette: Appearance", ":material/calendar_month: Calendar", ":material/chat: Assistant",
              ":material/notifications: Reminders", ":material/database: Data", ":material/info: About"]
@@ -326,7 +326,7 @@ def page_settings():
     with look:
         appearance_section()
     with cal:
-        st.subheader("Outlook calendar")
+        st.subheader("Outlook calendar", anchor=False)
         connected = calendar_status("set")
         if connected:
             with st.expander("Connect a different calendar", icon=":material/link:"):
@@ -334,7 +334,7 @@ def page_settings():
         else:
             outlook_guide("set")
     with claude:
-        st.subheader("Claude assistant")
+        st.subheader("Claude assistant", anchor=False)
         st.markdown(AI_PITCH)
         if ai_switch("set") != ai:
             st.rerun()                                   # show or hide the chat box straight away
@@ -342,15 +342,15 @@ def page_settings():
             claude_section("set")
     if mic:
         with mic:
-            st.subheader("Voice input")
+            st.subheader("Voice input", anchor=False)
             mic_section("set")
     with remind:
-        st.subheader("Reminders")
+        st.subheader("Reminders", anchor=False)
         reminders_section()
     with data:
         _data_section()
     with about:
-        st.subheader("About Arete")
+        st.subheader("About Arete", anchor=False)
         st.markdown(
             "A personal life tracker: timetable, daily log and journal, habits, to-dos, goals, your network, "
             "stats, and an optional Claude assistant. "
@@ -364,7 +364,7 @@ def page_settings():
 
 
 def _data_section():
-    st.subheader("Where your data lives")
+    st.subheader("Where your data lives", anchor=False)
     st.markdown(f":material/folder: `{store.DATA_DIR}`")
     a, b, c = st.columns(3)
     if a.button("Open data folder", icon=":material/folder_open:"):
@@ -379,13 +379,13 @@ def _data_section():
                + (f", latest {backups[0].name}" if backups else "") + ".")
     _backup_settings()
 
-    st.subheader("Export")
+    st.subheader("Export", anchor=False)
     st.write("Your daily log and habits as one CSV: one row per date, one column per habit.")
     csv = store.load_all_data().to_csv(index=False)
     st.download_button("Download CSV", csv, file_name=f"arete_export_{date.today()}.csv",
                        mime="text/csv", icon=":material/download:")
 
-    st.subheader("Import")
+    st.subheader("Import", anchor=False)
     st.write(
         f"Use the same format as the export: a `date` column (YYYY-MM-DD), optional "
         f"`mood`, `sleep`, `energy`, `water` (litres), `notes` columns, and `{store.HABIT_PREFIX}<name>` columns "
@@ -401,7 +401,7 @@ def _data_section():
             store.save_all_data(new, replace=mode.startswith("Replace"))
             st.success(f"Imported {len(new)} rows.")
 
-    st.subheader("Journal")
+    st.subheader("Journal", anchor=False)
     entries = store.journal_entries()
     st.write(f"Your journal (the Daily Log's notes) as one text file, oldest first ({len(entries)} entr{'y' if len(entries) == 1 else 'ies'}).")
     text = "\n\n".join(f"# {e['date']}\n\n{e['text']}" for e in reversed(entries))
@@ -423,7 +423,7 @@ def _data_section():
 
 def _backup_settings():
     """Automatic daily backups, and where backups go."""
-    st.subheader("Automatic backups")
+    st.subheader("Automatic backups", anchor=False)
     on, keep = setup_checks.auto_backup_settings()
     new_on = st.toggle("Back up automatically once a day", value=on, key="backup_auto",
                        help=f"While Arete is open. Keeps the newest {keep}; older ones are deleted.")
@@ -461,7 +461,7 @@ def _backup_settings():
 
 def _csv_section(name, slug, load, save, required, columns):
     """Export / import for to-dos or goals: their own CSV, one row per item."""
-    st.subheader(name)
+    st.subheader(name, anchor=False)
     st.write(f"{name} export and import as their own CSV, one row per item.")
     st.download_button(f"Download {name.lower()} CSV", load().to_csv(index=False),
                        file_name=f"arete_{slug}_{date.today()}.csv", mime="text/csv", icon=":material/download:")

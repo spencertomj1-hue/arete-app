@@ -46,6 +46,7 @@ button, input, select { font: inherit; }
   color: var(--text);
   font-size: 0.78rem;
 }
+.tt-goto:focus, .tt-goto:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }   /* every part of the date, incl. the picker */
 .tt-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 
 /* ---------- Legend / brush picker (one line) ---------- */

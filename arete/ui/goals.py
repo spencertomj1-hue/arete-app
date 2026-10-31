@@ -153,7 +153,7 @@ def _section(period, today):
 
 
 def render_page():
-    st.header("Goals")
+    st.header("Goals", anchor=False)
     st.caption("Measurable targets for the month or year, and deadlines. Day-to-day to-dos live on Home.")
     today = store.london_today()
     for col, period in zip(st.columns(2, gap="medium"), store.GOAL_PERIODS):
