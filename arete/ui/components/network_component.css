@@ -69,7 +69,7 @@ button { cursor: pointer; }
 .nw-node { cursor: pointer; transition: opacity 0.15s; }
 .nw-node circle { stroke: var(--bg); stroke-width: 2.5; transition: stroke 0.15s; }
 .nw-node text {
-  font-size: calc(13px * var(--label, 1));
+  font-size: calc(0.8125rem * var(--label, 1));
   font-weight: 500;
   text-anchor: middle;
   fill: var(--text);
@@ -81,9 +81,9 @@ button { cursor: pointer; }
 }
 .nw-node.me circle { fill: var(--text); }
 .nw-node.hub circle { fill-opacity: 0.16; stroke-width: 2.5; }
-.nw-node.hub text { font-weight: 700; font-size: calc(12px * var(--label, 1)); fill: var(--text); }
+.nw-node.hub text { font-weight: 700; font-size: calc(0.75rem * var(--label, 1)); fill: var(--text); }
 .nw-node.hub.sub circle { stroke-width: 2; stroke-dasharray: 4 3; }
-.nw-node.hub.sub text { font-size: calc(11px * var(--label, 1)); }
+.nw-node.hub.sub text { font-size: calc(0.6875rem * var(--label, 1)); }
 .nw-node.me text { font-weight: 700; }
 .nw-node.person:hover circle, .nw-node.me:hover circle { stroke: var(--text); }
 .nw-node.hub:hover circle { fill-opacity: 0.28; }

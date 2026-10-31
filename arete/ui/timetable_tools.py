@@ -231,13 +231,14 @@ def open_fit(label, last):
 
 
 def toolbar(day):
-    a, b, c, _ = st.columns([1, 1, 1, 4])
-    if a.button("Add block", icon=":material/add:", width="stretch", key="tt_btn_add"):
+    row = st.container(horizontal=True, gap="small")     # sized to the text, so bigger text never truncates
+    a = b = c = row
+    if a.button("Add block", icon=":material/add:", key="tt_btn_add"):
         st.session_state.pop(PENDING, None)
         _add_block_dialog(day)
-    if b.button("Fit time", icon=":material/event_available:", width="stretch", key="tt_btn_fit",
+    if b.button("Fit time", icon=":material/event_available:", key="tt_btn_fit",
                 help="Fit hours of something (e.g. 6 h of revision) into your free time"):
         st.session_state.pop(PENDING, None)
         _fit_dialog(day)
-    if c.button("Categories", icon=":material/palette:", width="stretch", key="tt_btn_cats"):
+    if c.button("Categories", icon=":material/palette:", key="tt_btn_cats"):
         _categories_dialog()

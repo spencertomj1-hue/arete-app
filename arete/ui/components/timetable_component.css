@@ -20,12 +20,13 @@ button, input, select { font: inherit; }
 
 .tt-head {
   display: flex;
+  flex-wrap: wrap;            /* onto a second line rather than squashing (narrow window, large text) */
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
   margin-bottom: 8px;
 }
 .tt-title { font-size: 1.45rem; font-weight: 600; letter-spacing: -0.01em; margin-right: 6px; }
-.tt-nav { display: inline-flex; border: 1px solid rgba(128, 128, 128, 0.35); border-radius: 999px; overflow: hidden; }
+.tt-nav { display: inline-flex; flex: none; border: 1px solid rgba(128, 128, 128, 0.35); border-radius: 999px; overflow: hidden; }
 .tt-nav button {
   padding: 4px 12px;
   border: none;
@@ -271,7 +272,7 @@ td.s.sel { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .tt-ol-toggle.on { opacity: 1; background: rgba(128, 128, 128, 0.12); }
 .tt-sync:hover, .tt-ol-toggle:hover { background: rgba(128, 128, 128, 0.1); }
 .msr {   /* Streamlit's Material Symbols font, loaded on the page */
-  font-family: "Material Symbols Rounded"; font-size: 18px; line-height: 1;
+  font-family: "Material Symbols Rounded"; font-size: 1.125rem; line-height: 1;
   font-feature-settings: "liga"; -webkit-font-feature-settings: "liga";
 }
 .tt-sync.spin .msr { animation: tt-spin 0.9s linear infinite; }

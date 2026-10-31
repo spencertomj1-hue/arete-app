@@ -44,7 +44,7 @@ def apply():
     /* Only while it's open: closed, it takes no room, so the page slides across to fill it. */
     [data-testid="stSidebar"] {{ transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease, transform 0.3s ease; }}
     [data-testid="stSidebar"][data-collapsed="false"] {{
-        width: 196px !important; min-width: 196px !important; max-width: 196px !important;
+        width: 12.25rem !important; min-width: 12.25rem !important; max-width: 12.25rem !important;   /* grows with the text size */
     }}
     [data-testid="stSidebar"][data-collapsed="true"] {{
         width: 0 !important; min-width: 0 !important; max-width: 0 !important;

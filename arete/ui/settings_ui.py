@@ -304,6 +304,12 @@ def appearance_section():
     if picked and picked != current:
         appearance.set_mode(picked)
         st.rerun()                               # the sync script then switches the theme
+    size = appearance.text_size()
+    new_size = st.segmented_control("Text size", list(appearance.SIZES), default=size, key="set_text_size")
+    if new_size and new_size != size:
+        appearance.set_text_size(new_size)
+        st.rerun()
+    st.markdown("The quick brown fox jumps over the lazy dog: this is how text looks at this size.")
 
 
 def page_settings():

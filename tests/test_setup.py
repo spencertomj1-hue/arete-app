@@ -241,3 +241,13 @@ def test_automatic_backups(store, tmp_path):
         setup_checks.set_backups_dir("relative/path")
     setup_checks.set_backups_dir(None)
     assert setup_checks.backups_dir() == store.DATA_DIR / "backups"
+
+
+def test_text_size_setting(store):
+    from arete.ui import appearance
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    assert not any("font-size: 20px" in h.value for h in at.get("html"))
+    at.sidebar.radio[0].set_value("Settings").run()
+    at.segmented_control(key="set_text_size").set_value("Extra large").run()
+    assert not at.exception and appearance.text_size() == "Extra large"
+    assert any("html { font-size: 20px !important; }" in h.value for h in at.get("html"))

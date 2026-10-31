@@ -212,6 +212,7 @@ from arete.ui import sidebar_theme          # the marble sidebar and its boxed m
 from arete.ui import appearance             # light / dark / system
 appearance.sync()
 appearance.apply_text_colours()
+appearance.apply_text_size()
 sidebar_theme.apply()
 
 

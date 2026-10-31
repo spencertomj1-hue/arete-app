@@ -13,6 +13,8 @@ import streamlit as st
 from arete import store
 
 MODES = ["System", "Light", "Dark"]
+# Text sizes: the page's root font size. Streamlit and the components size text in rem, so it all follows.
+SIZES = {"Small": 14, "Normal": 16, "Large": 18, "Extra large": 20}
 
 _sync_component = st.components.v2.component(
     "arete_theme_sync",
@@ -49,6 +51,21 @@ def is_dark():
         return st.context.theme.type == "dark"
     except AttributeError:
         return False
+
+
+def text_size():
+    s = store.load_settings().get("text_size", "Normal")
+    return s if s in SIZES else "Normal"
+
+
+def set_text_size(name):
+    store.save_settings(text_size=name if name in SIZES else "Normal")
+
+
+def apply_text_size():
+    px = SIZES[text_size()]
+    if px != 16:
+        st.html(f"<style>html {{ font-size: {px}px !important; }}</style>")
 
 
 def apply_text_colours():
