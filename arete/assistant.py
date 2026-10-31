@@ -192,6 +192,12 @@ What the app tracks
   - The category is picked from the activity label when there's a default for it; otherwise
     pass a category name. If no category fits, ask which one to use.
   - To change or delete a block, find its id with query_blocks first.
+  - To fit an amount of time around what's already planned ("fit 6 hours of revision into next
+    week around my lectures"), use plan_time: it finds the free gaps in the Plan (around the
+    user's blocks and Outlook events), spreads the hours over the days, and shows the user a
+    preview to confirm. Don't place those blocks one by one yourself. Pass earliest/latest or
+    weekdays_only if the user says when ("only mornings", "not at weekends"), and
+    max_block_hours for how long each sitting should be (default 2).
   - Categories and their colours, and which category an activity uses by default, are changed
     only by you (edit_category, set_activity_default); there are no editors in the app for them.
     Use hex colours (e.g. "make Gym dark green" -> #1B7F3B). Ask before creating a new category.
@@ -299,6 +305,16 @@ TOOL_SPECS = [
      tools.update_block),
     ("delete_block", "Delete a timetable block, or remove an Outlook event (id 'outlook:...') from the timetable.",
      _schema(["block_id"], block_id={"type": "string"}), tools.delete_block),
+    ("plan_time", "Fit some hours of an activity into the free gaps of the Plan between two dates (around existing "
+     "blocks and Outlook events), spread over the days. Always previewed for the user to confirm.",
+     _schema(["label", "hours", "start_date", "end_date"], label={"type": "string", "description": "e.g. 'Revision'"},
+             hours={"type": "number"}, start_date=DATE, end_date=DATE,
+             category={"type": "string", "description": "category name (default: from the label)"},
+             earliest={**TIME, "description": "no earlier than (default 09:00)"},
+             latest={**TIME, "description": "finished by (default 21:00)"},
+             max_block_hours={"type": "number", "description": "longest single sitting (default 2)"},
+             weekdays_only={"type": "boolean"}),
+     tools.plan_time),
     ("query_blocks", "List timetable blocks (with ids) between two dates, optionally one track.",
      _schema(["start_date", "end_date"], start_date=DATE, end_date=DATE, track=TRACK), tools.query_blocks),
     ("query_entries", "List daily log entries and ticked habits between two dates.",

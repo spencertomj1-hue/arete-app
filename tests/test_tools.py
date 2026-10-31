@@ -383,3 +383,49 @@ def test_sub_group_tools(tools, store):
     assert r.pending.summary == "Delete the group Chess Club; its people and sub-groups move to the top level"
     r.pending.run()
     assert store.find_people("Sam")[0]["group_id"] is None
+
+
+# --- plan_time (fitting hours around what's planned) ---
+
+def test_plan_time_fits_around_blocks_and_spreads(tools, store):
+    # Mon 26 Oct: lectures 09:00-12:00 and 14:00-16:00; Tue: lecture 10:00-11:00.
+    tools.add_block("2026-10-26", "plan", "09:00", "12:00", "Lectures", category="Classes")
+    tools.add_block("2026-10-26", "plan", "14:00", "16:00", "Lectures", category="Classes")
+    tools.add_block("2026-10-27", "plan", "10:00", "11:00", "Lectures", category="Classes")
+    r = tools.plan_time("Revision", 6, "2026-10-26", "2026-10-28", category="Study", earliest="09:00", latest="18:00")
+    assert r.pending and "Plan 6 h of Revision" in r.pending.summary
+    assert store.blocks_between("2026-10-26", "2026-10-28", "plan")[0]["label"] == "Lectures"   # nothing yet
+    r.pending.run()
+    rev = [(b["date"], b["start"], b["end"]) for b in store.blocks_between("2026-10-26", "2026-10-28", "plan")
+           if b["label"] == "Revision"]
+    hours = sum((store.slot_of(e) - store.slot_of(s)) / 2 for _, s, e in rev)
+    assert hours == 6
+    assert {d for d, _, _ in rev} == {"2026-10-26", "2026-10-27", "2026-10-28"}          # spread over the days
+    lectures = [b for b in store.blocks_between("2026-10-26", "2026-10-28", "plan") if b["label"] == "Lectures"]
+    assert len(lectures) == 3                                                            # nothing overwritten
+    for d, s, e in rev:                                                                  # all inside 09:00-18:00
+        assert "09:00" <= s and e <= "18:00"
+
+
+def test_plan_time_when_it_does_not_all_fit(tools, store):
+    for day in ("2026-10-26", "2026-10-27"):
+        tools.add_block(day, "plan", "09:00", "17:00", "Work", category="Work")
+    r = tools.plan_time("Reading", 5, "2026-10-26", "2026-10-27", earliest="09:00", latest="18:00",
+                        category="Reading")
+    assert "only 2 of 5 hours fit" in r.pending.summary
+    assert "no free time" in tools.plan_time("Reading", 1, "2026-10-26", "2026-10-26", earliest="09:00",
+                                             latest="17:00", category="Reading").text
+
+
+def test_plan_time_weekdays_only_and_validation(tools, store):
+    r = tools.plan_time("Gym", 2, "2026-10-31", "2026-11-02", category="Exercise", weekdays_only=True)
+    assert "Mon 2 Nov" in r.pending.summary and "Sat" not in r.pending.summary
+    with pytest.raises(tools.ToolError):
+        tools.plan_time("Gym", 0, "2026-10-26", "2026-10-27")
+    with pytest.raises(tools.ToolError):
+        tools.plan_time("Gym", 2, "2026-10-26", "2026-10-27", earliest="18:00", latest="09:00")
+
+
+def test_plan_time_spaces_sittings_out(tools, store):
+    r = tools.plan_time("Revision", 6, "2026-11-02", "2026-11-06", category="Study")     # Mon-Fri, 3 sittings
+    assert [x.split(" ")[0] for x in r.pending.summary.split(": ", 1)[1].split("; ")] == ["Mon", "Wed", "Fri"]

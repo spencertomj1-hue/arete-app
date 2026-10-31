@@ -425,6 +425,84 @@ def delete_block(block_id, confirmed=False):
     return Result(f"Done: {summary}.", changed=True)
 
 
+def _days_between(first, last, weekdays_only):
+    d, out = date.fromisoformat(first), []
+    while d <= date.fromisoformat(last):
+        if not weekdays_only or d.weekday() < 5:
+            out.append(d.isoformat())
+        d += timedelta(days=1)
+    return out
+
+
+def plan_time(label, hours, start_date, end_date, category=None, earliest="09:00", latest="21:00",
+              max_block_hours=2, weekdays_only=False, confirmed=False):
+    """
+    Fit `hours` of an activity into the free gaps of the Plan between two dates,
+    around the user's blocks and Outlook events, spread across the days (one
+    block per day per round, up to max_block_hours each). Always previewed first.
+    """
+    label = str(label).strip()
+    if not label:
+        raise ToolError("Say what to plan (a label, e.g. 'Revision').")
+    try:
+        need = round(float(hours) * 2)                       # in 30-minute slots
+    except (TypeError, ValueError):
+        raise ToolError("hours must be a number, e.g. 6.")
+    if need < 1:
+        raise ToolError("hours must be at least 0.5.")
+    first_day, last_day = _date_range(start_date, end_date, max_days=31)
+    lo, hi = _slot(earliest, False), _slot(latest, True)
+    if hi <= lo:
+        raise ToolError("latest must be after earliest.")
+    chunk = max(1, round(float(max_block_hours) * 2))
+    cid = _category(label, category)
+    days = _days_between(first_day, last_day, bool(weekdays_only))
+    if not days:
+        raise ToolError("There are no days in that range (check weekdays_only).")
+
+    # If it needs fewer sittings than there are days, try evenly spaced days first
+    # (6 h in 2 h sittings over a week: Mon, Wed, Fri rather than Mon, Tue, Wed).
+    sittings = -(-need // chunk)
+    if sittings < len(days):
+        spaced = [days[round(i * (len(days) - 1) / max(sittings - 1, 1))] for i in range(sittings)]
+        days = list(dict.fromkeys(spaced + days))
+    free = {d: store.free_runs(d, lo, hi) for d in days}
+    placed = []                                              # (day, start slot, end slot)
+    left = need
+    while left > 0:
+        progress = False
+        for d in days:                                       # one block per day per round: spreads it out
+            if left <= 0 or not free[d]:
+                continue
+            want = min(chunk, left)
+            # The earliest gap that fits the whole block, else the biggest gap there is.
+            a, b = next((r for r in free[d] if r[1] - r[0] >= want), max(free[d], key=lambda r: r[1] - r[0]))
+            s, e = a, min(b, a + want)
+            placed.append((d, s, e))
+            left -= e - s
+            # Use up that gap, keeping a half-hour break after the block before the next one that day.
+            rest = [(e + 1, b)] if e + 1 < b else []
+            free[d] = sorted([r for r in free[d] if r != (a, b)] + rest)
+            progress = True
+        if not progress:
+            break
+
+    if not placed:
+        return Result(f"There's no free time in the Plan between {earliest} and {latest} on those days.")
+    placed.sort()
+    names = _cat_names()
+    got = sum(e - s for _, s, e in placed) / 2
+    lines = "; ".join(f"{nice_day(d)} {store.slot_time(s)}–{store.slot_time(e)}" for d, s, e in placed)
+    short = f" (only {got:g} of {need / 2:g} hours fit)" if got < need / 2 else ""
+    summary = f"Plan {got:g} h of {label} ({names[cid]}){short}: {lines}"
+    if not confirmed:
+        return Result("", pending=Pending(summary, lambda: plan_time(
+            label, hours, start_date, end_date, category, earliest, latest, max_block_hours, weekdays_only, True)))
+    for d, s, e in placed:
+        store.paint(d, "plan", s, e, {"label": label, "category_id": cid, "details": None})
+    return Result(f"Done: {summary}.", changed=True)
+
+
 def query_blocks(start_date, end_date, track=None):
     first, last = _date_range(start_date, end_date)
     trk = _track(track) if track else None

@@ -70,6 +70,7 @@ It runs entirely on your computer (Mac or Windows) as a normal app. It's built w
 **Claude chat.** Type or speak what you want changed, for example:
 > "I went to the gym from 6 to 7 tonight"
 > "Plan a lecture 9 till 11 tomorrow"
+> "Fit 6 hours of revision into next week around my lectures"
 > "Mood 4 today, slept 7 and a half hours, tick reading"
 > "How much did I actually study this week?"
 > "Add go gym to this week's to-dos"

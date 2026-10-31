@@ -818,6 +818,30 @@ def outlook_category(title):
     return wanted if wanted in ids else (ids[0] if ids else wanted)
 
 
+def free_runs(day, first=0, last=SLOTS):
+    """
+    Free stretches of a day's Plan between slots first..last-1, as [(start, end)]
+    slot pairs: no block of the user's and no (visible, timed) Outlook event in them.
+    """
+    busy = [False] * SLOTS
+    for b in blocks_between(day, day, "plan"):
+        for i in range(slot_of(b["start"]), min(slot_of(b["end"]), SLOTS)):
+            busy[i] = True
+    for ev in outlook_between(day, day):
+        if not ev["all_day"]:
+            for i in range(slot_of(ev["start"]), min(slot_of(ev["end"]), SLOTS)):
+                busy[i] = True
+    runs, start = [], None
+    for i in range(first, last + 1):
+        free = i < last and not busy[i]
+        if free and start is None:
+            start = i
+        elif not free and start is not None:
+            runs.append((start, i))
+            start = None
+    return runs
+
+
 def outlook_overlaps(day, s, e):
     """Visible timed Outlook events on that timetable day covering any of slots s..e-1."""
     return [r for r in outlook_between(day, day)

@@ -167,6 +167,7 @@ Two different things:
 - **Tools:**
   - `log_day`, `set_habit`, `add_habit`, `list_habits`
   - `add_block`, `update_block`, `delete_block`, `query_blocks`, `query_entries`, `get_stats`
+  - `plan_time`: fits N hours of an activity into the Plan's free gaps (`store.free_runs`: around the user's blocks and visible Outlook events) between two dates, within earliest/latest, in sittings of up to `max_block_hours`, spread over evenly spaced days with a 30-minute break between sittings on the same day. Always a preview (Confirm paints them).
   - `list_categories`, `edit_category`, `set_activity_default`, `set_outlook_category`
   - To-dos: `add_todo`, `complete_todo`, `uncomplete_todo`, `list_todos`, `delete_todo` (confirm first).
   - Goals: `add_goal`, `log_goal_progress`, `set_goal_progress`, `edit_goal`, `list_goals`, `delete_goal` (confirm first). Progress tools refuse habit-linked goals and point Claude at `set_habit`.
