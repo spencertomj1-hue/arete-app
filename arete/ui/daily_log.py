@@ -200,7 +200,7 @@ def render_home_habits():
     d = today.isoformat()
     for habit_id, name in habits:
         done = store.get_habit_dates(habit_id)
-        current, _ = store.streaks(done, today)
+        _, current, per_week = store.habit_progress(habit_id, done, today)
         key = f"home_habit_{habit_id}_{d}"
         tick, week, streak = st.columns([5, 3, 2], vertical_alignment="center")
         tick.checkbox(name, value=d in done, key=key, on_change=_toggle_habit, args=(habit_id, d, key))
@@ -208,7 +208,15 @@ def render_home_habits():
             f'<i class="{"on" if x.isoformat() in done else ""}{" today" if x == today else ""}" '
             f'title="{x:%a} {x.day} {x:%b}"></i>' for x in days)
         week.html(f'<div class="hb-week" title="Last 7 days">{cells}</div>')
-        streak.caption(f":material/local_fire_department: {current}" if current else "–")   # current streak
+        if per_week:      # a weekly target: this week's count, and the streak in weeks
+            streak.caption(f"{store.week_ticks(done, today)}/{per_week} this wk"
+                           + (f" · :material/local_fire_department: {current}w" if current else ""))
+        else:
+            streak.caption(f":material/local_fire_department: {current}" if current else "–")   # current streak
+
+
+# "How often" choices: index 0 is every day, index n is n times a week.
+OFTEN = ["Every day"] + [f"{n} time{'s' * (n > 1)} a week" for n in range(1, 8)]
 
 
 def _habits_for(day, today):
@@ -220,18 +228,30 @@ def _habits_for(day, today):
         st.caption("No habits yet. Add one below.")
     for habit_id, name in habits:
         done_dates = store.get_habit_dates(habit_id)
-        current, best = store.streaks(done_dates)
+        progress, _, _ = store.habit_progress(habit_id, done_dates, min(day, today))
         key = f"habit_{habit_id}_{d}"
         left, right = st.columns([3, 2])
         left.checkbox(name, value=d in done_dates, key=key, disabled=day > today,
                       on_change=_toggle_habit, args=(habit_id, d, key))
-        right.caption(f"{current}-day streak · best {best}")
+        right.caption(progress)
 
     with st.expander("Manage habits"):
         with st.form("add_habit", clear_on_submit=True):
-            new_name = st.text_input("New habit")
-            if st.form_submit_button("Add habit") and new_name.strip():
-                store.add_habit(new_name.strip())
+            a, b, c = st.columns([3, 2, 1], vertical_alignment="bottom")
+            new_name = a.text_input("New habit")
+            how = b.selectbox("How often", OFTEN, key="habit_new_often")
+            if c.form_submit_button("Add habit") and new_name.strip():
+                store.add_habit(new_name.strip(), OFTEN.index(how) or None)
+                st.rerun()
+
+        if habits:
+            targets = store.habit_targets()
+            names = {name: habit_id for habit_id, name in habits}
+            a, b, c = st.columns([3, 2, 1], vertical_alignment="bottom")
+            which = a.selectbox("Change how often", list(names), key="habit_often_which")
+            how = b.selectbox("How often", OFTEN, index=targets.get(names[which], 0), key=f"habit_often_{names[which]}")
+            if c.button("Save", key="habit_often_save"):
+                store.set_habit_target(names[which], OFTEN.index(how) or None)
                 st.rerun()
 
         if habits:

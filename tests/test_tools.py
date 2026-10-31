@@ -90,7 +90,7 @@ def test_list_habits(tools):
     tools.add_habit("Read")
     tools.set_habit("2026-10-28", "Read", True)
     tools.set_habit("2026-10-29", "Read", True)
-    assert "current streak 2" in tools.list_habits(today=date(2026, 10, 29)).text
+    assert "Read (every day): done today, 2-day streak · best 2" in tools.list_habits(today=date(2026, 10, 29)).text
 
 
 # --- timetable ---
@@ -464,3 +464,24 @@ def test_plan_time_skips_the_past(tools, store):
     assert r.pending.summary.endswith("Tue 27 Oct 12:30–14:30; Wed 28 Oct 09:00–11:00")
     with pytest.raises(tools.ToolError, match="already over"):
         tools.plan_time("Revision", 2, "2026-10-20", "2026-10-26")
+
+
+def test_weekly_habit_targets(tools, store):
+    assert tools.add_habit("Gym", times_per_week=3).text == "Added habit 'Gym' (3 times a week)."
+    gid = store.find_habit("Gym")[0]
+    with store.db() as conn:                          # weeks of 26 Oct and 19 Oct hit 3; 12 Oct only 2
+        for d in ("2026-10-12", "2026-10-14", "2026-10-19", "2026-10-21", "2026-10-23",
+                  "2026-10-26", "2026-10-27", "2026-10-29"):
+            store.set_habit_done(conn, gid, d, True)
+    dates = store.get_habit_dates(gid)
+    assert store.week_ticks(dates, date(2026, 10, 30)) == 3
+    assert store.weekly_streaks(dates, 3, date(2026, 10, 30)) == (2, 2)
+    assert store.weekly_streaks(dates, 3, date(2026, 11, 2)) == (2, 2)    # new week not hit yet: no break
+    assert store.weekly_streaks(dates, 3, date(2026, 11, 9)) == (0, 2)    # a whole week missed
+    assert "Gym (3 times a week): not done today, 3 of 3 this week · 2-week streak · best 2" in \
+        tools.list_habits(date(2026, 10, 30)).text
+    assert store.get_stats(7, date(2026, 11, 1))["habit_completion_pct"]["Gym"] == 100.0
+    tools.set_habit_target("gym")
+    assert "Gym (every day)" in tools.list_habits(date(2026, 10, 30)).text
+    with pytest.raises(tools.ToolError):
+        tools.set_habit_target("Gym", 9)

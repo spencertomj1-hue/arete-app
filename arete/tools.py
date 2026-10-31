@@ -179,14 +179,39 @@ def set_habit(date, habit_name, done, confirmed=False):
     return Result(f"Done: {summary}.", changed=True)
 
 
-def add_habit(name):
+def _per_week(times_per_week):
+    if times_per_week in (None, "", 0):
+        return None
+    try:
+        n = int(times_per_week)
+    except (TypeError, ValueError):
+        raise ToolError("times_per_week must be a whole number from 1 to 7.")
+    if not 1 <= n <= 7:
+        raise ToolError("times_per_week must be from 1 to 7 (or leave it out for every day).")
+    return n
+
+
+def _often(per_week):
+    return f"{per_week} time{'s' * (per_week > 1)} a week" if per_week else "every day"
+
+
+def add_habit(name, times_per_week=None):
     name = str(name).strip()
     if not name:
         raise ToolError("The habit needs a name.")
     if store.find_habit(name):
         return Result(f"A habit called '{name}' already exists.")
-    store.add_habit(name)
-    return Result(f"Added habit '{name}'.", changed=True)
+    per_week = _per_week(times_per_week)
+    store.add_habit(name, per_week)
+    return Result(f"Added habit '{name}' ({_often(per_week)}).", changed=True)
+
+
+def set_habit_target(habit_name, times_per_week=None):
+    """How often a habit is meant to happen: N times a week, or every day (None / 0)."""
+    habit_id, name = _find_habit(habit_name)
+    per_week = _per_week(times_per_week)
+    store.set_habit_target(habit_id, per_week)
+    return Result(f"{name} is now {_often(per_week)}.", changed=True)
 
 
 def list_habits(today=None):
@@ -194,9 +219,9 @@ def list_habits(today=None):
     lines = []
     for habit_id, name in store.get_habits():
         dates = store.get_habit_dates(habit_id)
-        current, best = store.streaks(dates, today)
+        progress, _, per_week = store.habit_progress(habit_id, dates, today)
         done_today = "done today" if today.isoformat() in dates else "not done today"
-        lines.append(f"- {name}: {done_today}, current streak {current}, best {best}")
+        lines.append(f"- {name} ({_often(per_week)}): {done_today}, {progress}")
     return Result("\n".join(lines) or "No habits yet.")
 
 

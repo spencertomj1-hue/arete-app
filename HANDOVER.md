@@ -76,7 +76,7 @@ tests/                         pytest + AppTest; tests/fixtures/sample.ics is a 
 | Table | Contents |
 |---|---|
 | `entries` | Daily log: `date` (PK), `mood` 1–5, `sleep` hours, `energy` 1–5, `notes`, `water` litres (added by `_add_column`; `save_entry(water=KEEP)` leaves it alone) |
-| `habits`, `habit_log` | Habits, and one row per (habit, date) ticked. Cascade delete. |
+| `habits`, `habit_log` | Habits (`per_week`: NULL = every day, else a weekly target 1–7), and one row per (habit, date) ticked. Cascade delete. Weekly habits: `week_ticks`, `weekly_streaks` (weeks that hit the target), `habit_progress` gives the one-line summary; Stats counts them as % of the target. |
 | `tt_categories` | `id`, `name`, `colour` (#RRGGBB), `text_colour` (NULL = automatic), `grp` (heading in the key), `ord` |
 | `tt_label_map` | Activity label → default category (case-insensitive lookups) |
 | `tt_entries` | The user's timetable blocks: `id`, `date`, `track` (plan/actual), `start`/`"end"` ("HH:mm", end exclusive, may be "01:00"), `label`, `category_id`, `details` |

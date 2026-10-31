@@ -177,7 +177,9 @@ What the app tracks
 - Daily log: per date, mood 1-5, sleep hours, energy 1-5, water drunk (litres) and the day's notes,
   which are its journal entry (log_day for the numbers; write_journal for the notes). "drank 2 litres today" -> water=2; a 500 ml bottle is 0.5; glasses are about 0.25 L.
   water is the day's total: for "another 500 ml", check the day first (query_entries) and add to it.
-- Habits: named habits ticked per day, with streaks (set_habit, add_habit, list_habits).
+- Habits: named habits ticked per day, with streaks (set_habit, add_habit, list_habits). A habit is
+  either every day or has a weekly target ("gym 3 times a week" -> add_habit("Gym", times_per_week=3),
+  or set_habit_target for an existing one); weekly ones count ticks per Monday-Sunday week.
   Only add a new habit if the user clearly asks for one.
 - Timetable: every day has two tracks, "plan" (what they intend to do) and "actual"
   (what they really did). If they describe something that already happened ("I went to the gym
@@ -303,7 +305,12 @@ TOOL_SPECS = [
     ("set_habit", "Tick (done=true) or untick (done=false) a habit on a date.",
      _schema(["date", "habit_name", "done"], date=DATE, habit_name={"type": "string"}, done={"type": "boolean"}),
      tools.set_habit),
-    ("add_habit", "Create a new habit to track.", _schema(["name"], name={"type": "string"}), tools.add_habit),
+    ("add_habit", "Create a new habit to track (every day, or times_per_week for a weekly target).",
+     _schema(["name"], name={"type": "string"}, times_per_week={"type": "integer", "minimum": 1, "maximum": 7}),
+     tools.add_habit),
+    ("set_habit_target", "Change how often a habit is meant to happen: times_per_week 1-7, or leave it out for every day.",
+     _schema(["habit_name"], habit_name={"type": "string"}, times_per_week={"type": "integer", "minimum": 1, "maximum": 7}),
+     tools.set_habit_target),
     ("list_habits", "List habits with today's status and streaks.", _schema([]), tools.list_habits),
     ("add_block", "Add a timetable block. Category is optional; it's picked from the label when there's a default.",
      _schema(["date", "track", "start", "end", "label"], date=DATE, track=TRACK, start=TIME, end=TIME,

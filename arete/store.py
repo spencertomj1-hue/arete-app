@@ -232,6 +232,7 @@ def init_db():
         # Columns added after the first release.
         _add_column(conn, "tt_entries", "details", "TEXT")
         _add_column(conn, "entries", "water", "REAL")
+        _add_column(conn, "habits", "per_week", "INTEGER")          # NULL = every day; else N times a week
         _journal_became_notes(conn)
         _add_column(conn, "tt_outlook", "description", "TEXT")
         _add_column(conn, "net_groups", "parent_id", "TEXT")
@@ -421,9 +422,68 @@ def find_habit(name):
         ).fetchone()
 
 
-def add_habit(name):
+def add_habit(name, per_week=None):
     with db() as conn:
         conn.execute("INSERT OR IGNORE INTO habits (name) VALUES (?)", (name,))
+        if per_week:
+            conn.execute("UPDATE habits SET per_week = ? WHERE name = ?", (_check_per_week(per_week), name))
+
+
+def _check_per_week(n):
+    n = int(n)
+    if not 1 <= n <= 7:
+        raise ValueError("A weekly target is 1 to 7 times a week.")
+    return n
+
+
+def habit_targets():
+    """{habit id: times a week} for habits with a weekly target (the rest are every day)."""
+    with db() as conn:
+        return dict(conn.execute("SELECT id, per_week FROM habits WHERE per_week IS NOT NULL").fetchall())
+
+
+def set_habit_target(habit_id, per_week):
+    """N times a week, or None for every day."""
+    with db() as conn:
+        conn.execute("UPDATE habits SET per_week = ? WHERE id = ?",
+                     (_check_per_week(per_week) if per_week else None, habit_id))
+
+
+def week_ticks(done_dates, day):
+    """How many times it was ticked in the week (Monday to Sunday) containing `day`."""
+    monday = _as_date(day) - timedelta(days=_as_date(day).weekday())
+    return sum((monday + timedelta(days=i)).isoformat() in done_dates for i in range(7))
+
+
+def weekly_streaks(done_dates, per_week, today=None):
+    """(current, best) runs of weeks that hit the target. This week counts once it's hit;
+    until then the streak runs to last week, so it doesn't break before the week is over."""
+    today = today or date.today()
+    this_monday = today - timedelta(days=today.weekday())
+    mondays = sorted({d - timedelta(days=d.weekday()) for d in map(date.fromisoformat, done_dates)})
+    hit = {m for m in mondays if week_ticks(done_dates, m) >= per_week}
+    best = run = 0
+    prev = None
+    for m in sorted(hit):
+        run = run + 1 if prev and m - prev == timedelta(weeks=1) else 1
+        best, prev = max(best, run), m
+    week = this_monday if this_monday in hit else this_monday - timedelta(weeks=1)
+    current = 0
+    while week in hit:
+        current, week = current + 1, week - timedelta(weeks=1)
+    return current, best
+
+
+def habit_progress(habit_id, done_dates, today=None):
+    """One line about a habit's progress: '3-day streak · best 9' or '2 of 3 this week · 4-week streak'."""
+    today = today or date.today()
+    per_week = habit_targets().get(habit_id)
+    if per_week:
+        current, best = weekly_streaks(done_dates, per_week, today)
+        return (f"{week_ticks(done_dates, today)} of {per_week} this week · {current}-week streak · best {best}",
+                current, per_week)
+    current, best = streaks(done_dates, today)
+    return f"{current}-day streak · best {best}", current, None
 
 
 def delete_habit(habit_id):
@@ -1659,7 +1719,9 @@ def get_stats(days=None, today=None):
             "SELECT habit_id, COUNT(*) FROM habit_log WHERE date BETWEEN ? AND ? GROUP BY habit_id",
             (first, last),
         ).fetchall())
-    habits = {name: round(100 * counts.get(hid, 0) / num_days, 1) for hid, name in get_habits()}
+    targets = habit_targets()      # a 3-times-a-week habit is 100% at 3 ticks a week
+    habits = {name: round(min(100.0, 100 * counts.get(hid, 0) / (num_days * targets[hid] / 7 if hid in targets else num_days)), 1)
+              for hid, name in get_habits()}
 
     cats = load_categories()
     names = dict(zip(cats["id"], cats["name"]))

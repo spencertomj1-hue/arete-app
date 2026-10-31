@@ -59,7 +59,7 @@ It runs entirely on your computer (Mac or Windows) as a normal app. It's built w
 - **Fit time:** say what (e.g. Revision), how many hours and which days; Arete finds free gaps around your blocks and Outlook events, spreads the sittings out and shows you the times before adding them.
 - **Moving around:** use ‹ Today › or a date picker, or swipe sideways on the trackpad.
 
-**Daily Log.** A month calendar showing each day's mood, sleep, energy and litres of water. Click a day to read its notes, tick that day's habits (with current and best streaks), and save its entry. Habits are added and removed here too.
+**Daily Log.** A month calendar showing each day's mood, sleep, energy and litres of water. Click a day to read its notes, tick that day's habits (with current and best streaks), and save its entry. Habits are added and removed here too, each either every day or with a weekly target (e.g. Gym 3 times a week: progress shows as "2/3 this week", and streaks count weeks that hit it).
 
 **Network.** A map of the people you know, as a tree: you in the middle, a circle for each group branching off you, sub-groups branching off their group (e.g. Northfield → Physics Society, Robotics Lab), and people branching off the group they're in. Dashed lines join people who know each other.
 - **Adding:** tell Arete ("add Physics Society inside Northfield", "Priya is in Physics Society and knows Sam from football"), or use "Add someone" / "Add group". A group's card also has "Add person here" and "Add sub-group".
