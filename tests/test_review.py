@@ -64,3 +64,15 @@ def test_popup_once_and_history(store, monkeypatch):
     assert not any(m.label == "Hours logged" for m in at.metric)
     at.sidebar.radio[0].set_value("Stats").run()
     assert not at.exception and any("Weekly reviews" in s.value for s in at.subheader)
+
+
+def test_future_plans_dont_count(review, store, monkeypatch):
+    from datetime import datetime
+    from arete import tools
+    tools = importlib.reload(tools)
+    tools.add_block("2026-10-27", "plan", "09:00", "10:00", "Revision", category="Study")
+    tools.add_block("2026-10-27", "actual", "09:00", "10:00", "Revision", category="Study")
+    tools.add_block("2026-10-30", "plan", "09:00", "11:00", "Revision", category="Study")    # Friday: later on
+    monkeypatch.setattr(store, "local_now", lambda: datetime(2026, 10, 28, 12, 0))         # it's Wednesday
+    s = review.summary(date(2026, 10, 26))
+    assert (s["planned_hours"], s["followed_pct"]) == (1.0, 100)

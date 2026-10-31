@@ -72,10 +72,16 @@ def apply_text_colours():
     """Streamlit's captions are 60% text colour (3.7:1 on white); make them 4.5:1+ in either mode."""
     caption = "#A3A8B8" if is_dark() else "#5F6170"
     ring = accent()
+    # Dark mode's accent is a light red, so white text on it is too faint: primary buttons get dark text.
+    dark_buttons = ("""
+    [data-testid="stBaseButton-primary"], [data-testid="stBaseButton-primary"] *,
+    [data-testid="stBaseLinkButton-primary"], [data-testid="stBaseLinkButton-primary"] *,
+    [data-testid="stBaseButton-primaryFormSubmit"], [data-testid="stBaseButton-primaryFormSubmit"] * {
+        color: #1A1A1F !important; }""" if is_dark() else "")
     st.html(f"""<style>
     /* Keyboard focus is always visible (Streamlit's own controls draw theirs; this covers the rest). */
     section[data-testid="stMain"]:focus-visible {{ outline: 2px solid {ring}; outline-offset: -4px; }}
-    a:focus-visible, [tabindex]:focus-visible, summary:focus-visible {{ outline: 2px solid {ring}; outline-offset: 2px; }}
+    a:focus-visible, [tabindex]:focus-visible, summary:focus-visible {{ outline: 2px solid {ring}; outline-offset: 2px; }}{dark_buttons}
     [data-testid="stCaptionContainer"] {{ opacity: 1 !important; }}
     [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {{ color: {caption} !important; }}
     </style>""")

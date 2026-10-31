@@ -63,7 +63,14 @@ def _when(r):
         return ""
     if r["kind"] == "Review":
         return "week of " + regional.day_month(r["date"], weekday=False)
-    return regional.day_month(r["date"], year=store._as_date(r["date"]).year != store.local_today().year)
+    when = regional.day_month(r["date"], year=store._as_date(r["date"]).year != store.local_today().year)
+    if r["kind"] == "Timetable" and r["extra"]:               # "plan 10:00-12:00" -> "Plan, 10:00–12:00"
+        track, _, times = r["extra"].partition(" ")
+        start, _, end = times.partition("-")
+        when += f", {track.capitalize()} {regional.time_range(start, end)}"
+    elif r["kind"] == "Outlook" and r["extra"]:
+        when += f", {regional.time(r['extra'])}"
+    return when
 
 
 def render_home():

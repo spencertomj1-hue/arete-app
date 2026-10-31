@@ -20,6 +20,9 @@ primaryColor = "#C62828"       # the accent (Streamlit's default #FF4B4B is only
 redTextColor = "#C62828"
 orangeTextColor = "#B45309"
 grayTextColor = "#5F6170"
+greenTextColor = "#146C2E"      # success messages (Streamlit's default green is too faint on its tint)
+blueTextColor = "#0B4F9C"       # info messages
+yellowTextColor = "#7A4E00"     # warnings
 
 [theme.dark]
 primaryColor = "#FF6B6B"

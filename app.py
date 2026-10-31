@@ -132,7 +132,7 @@ def page_stats():
     a.metric("Avg mood", fmt(stats["avg_mood"]))
     b.metric("Avg sleep", fmt(stats["avg_sleep"], " h"))
     c.metric("Avg energy", fmt(stats["avg_energy"]))
-    d.metric("Avg water", regional.water_text(None if stats["avg_water"] is None else round(stats["avg_water"], 2)))
+    d.metric("Avg water", regional.water_text(None if stats["avg_water"] is None else round(stats["avg_water"], 1)))
 
     # --- Line charts ---
     if entries.empty:

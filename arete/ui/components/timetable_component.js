@@ -304,14 +304,14 @@ class Timetable {
           <button data-nav="0">Today</button>
           <button data-nav="1" title="Next week">›</button>
         </div>
-        <input type="date" class="tt-goto" title="Go to date" value="${days[0]}">
+        <input type="date" class="tt-goto" title="Go to date" aria-label="Go to date" value="${days[0]}">
         <div class="tt-outlook">
           <button class="tt-sync" title="Sync Outlook now"><span class="msr">sync</span></button>
           <span class="tt-synced"></span>
           <button class="tt-ol-toggle" title="Show or hide Outlook events">${CAL_ICON}Outlook</button>
         </div>
         <div class="tt-tools">
-          <input class="tt-label" list="tt-labels" placeholder="Label, e.g. Lecture" title="Label for new blocks">
+          <input class="tt-label" list="tt-labels" placeholder="Label, e.g. Lecture" title="Label for new blocks" aria-label="Label for new blocks">
           <datalist id="tt-labels"></datalist>
           <button class="sw eraser" data-cat="eraser">Eraser</button>
         </div>

@@ -58,6 +58,13 @@ def _slot_maps(day):
     return plan, actual
 
 
+def _slots_gone(day, now):
+    """How many of a timetable day's slots have started by `now` (all of them for a past day)."""
+    from datetime import datetime, time
+    start = datetime.combine(store._as_date(day), time(store.FIRST_MIN // 60, store.FIRST_MIN % 60))
+    return max(0, min(store.SLOTS, int((now - start).total_seconds() // 1800)))
+
+
 def summary(first):
     """Everything the review shows for the week starting `first` (a date)."""
     first = store._as_date(first)
@@ -69,8 +76,13 @@ def summary(first):
     cats = store.load_categories()
     names, colours = dict(zip(cats["id"], cats["name"])), dict(zip(cats["id"], cats["colour"]))
     hours, planned, matched = {}, 0, 0
+    now = store.local_now()
     for d in days:
         plan, actual = _slot_maps(d)
+        # Only time that's already happened counts (for "this week so far").
+        cutoff = _slots_gone(d, now)
+        plan = {k: v for k, v in plan.items() if k < cutoff}
+        actual = {k: v for k, v in actual.items() if k < cutoff}
         for track, slots in (("plan", plan), ("actual", actual)):
             for cat in slots.values():
                 hours.setdefault(cat, {"plan": 0.0, "actual": 0.0})[track] += 0.5
