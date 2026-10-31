@@ -381,6 +381,24 @@ def region_section():
                "Blocks outside these hours stay saved; widen the hours again to see them.")
 
 
+def _updates_section():
+    from arete import updates
+    current = updates.current_version()
+    st.markdown(f"**Version:** {current if current != 'dev' else 'running from the source code (update with git pull)'}")
+    on = st.toggle("Check for new versions once a day", value=updates.enabled(), key="about_updates",
+                   help="Asks GitHub for the latest release. Nothing about you is sent.")
+    if on != updates.enabled():
+        store.save_settings(update_check=on)
+    if current not in ("dev", "0.0.0") and st.button("Check now", icon=":material/refresh:", key="about_check"):
+        latest = updates.check(force=True)
+        if not latest:
+            st.warning("Couldn't reach GitHub. Are you online?")
+        elif updates.is_newer(latest["version"], current):
+            st.success(f"Arete {latest['version']} is available: [download it]({latest['url']}).")
+        else:
+            st.success("You have the latest version.")
+
+
 def page_settings():
     st.header("Settings", anchor=False)
     ai = store.ai_enabled()
@@ -429,6 +447,7 @@ def page_settings():
             f"Built with Streamlit and SQLite; runs entirely on your {system.COMPUTER}.\n\n"
             "Open source under the **MIT licence**."
         )
+        _updates_section()
         if st.button("Run the setup wizard again", icon=":material/restart_alt:"):
             st.session_state["wizard_open"] = True
             st.session_state["wizard_step"] = 0

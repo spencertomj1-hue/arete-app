@@ -121,4 +121,10 @@ def _loop():
             setup_checks.auto_backup_if_due()
         except Exception:
             log.exception("Automatic backup failed")
+        try:
+            from arete import updates          # ...and the daily "is there a new version?" check
+            if updates.current_version() not in ("dev", "0.0.0") and updates.enabled():
+                updates.check()
+        except Exception:
+            log.exception("Update check failed")
         time.sleep(CHECK_EVERY)

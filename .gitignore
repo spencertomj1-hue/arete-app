@@ -42,3 +42,4 @@ static/
 # --- Build output (PyInstaller / Inno Setup) ---
 build/
 dist/
+arete/VERSION

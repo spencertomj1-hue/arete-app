@@ -14,12 +14,15 @@ from PyInstaller.utils.hooks import collect_all
 ROOT = Path(SPECPATH).parent
 MAC = sys.platform == "darwin"
 VERSION = os.environ.get("ARETE_VERSION", "0.0.0")
+# The app reads its own version from arete/VERSION (for "a new version is available").
+(ROOT / "arete" / "VERSION").write_text(VERSION + "\n", encoding="utf-8")
 
 datas = [
     (str(ROOT / "app.py"), "."),                                     # Streamlit runs it as a file
     (str(ROOT / ".streamlit" / "config.toml"), ".streamlit"),
     (str(ROOT / "assets"), "assets"),
     (str(ROOT / "arete" / "ui" / "components"), "arete/ui/components"),
+    (str(ROOT / "arete" / "VERSION"), "arete"),
 ]
 binaries = []
 # app.py is a data file, so Arete's own modules are listed here, from the source files.

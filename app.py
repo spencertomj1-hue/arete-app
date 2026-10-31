@@ -244,6 +244,23 @@ PAGES = {
 st.sidebar.title("Arete")
 # Keyed so Home's goals "See all" can switch to the Goals page.
 choice = st.sidebar.radio("Go to", list(PAGES), label_visibility="collapsed", key="page")
+
+
+def update_banner():
+    """'Arete X is available' with a download link, when a newer release is out (arete/updates.py)."""
+    from arete import updates
+    new = updates.available()
+    if not new:
+        return
+    with st.container(key="update_banner", horizontal=True, vertical_alignment="center", gap="small"):
+        st.markdown(f":material/system_update: **Arete {new['version']} is available** "
+                    f"(you have {updates.current_version()}).")
+        st.link_button("Download", new["url"], icon=":material/download:", type="primary")
+        st.button("Not now", key="update_dismiss", on_click=updates.dismiss, args=(new["version"],),
+                  help="Hide this until the next version comes out")
+
+
+update_banner()
 PAGES[choice]()
 
 # The Claude chat bar, pinned to the bottom of every page (Home has it inline).
