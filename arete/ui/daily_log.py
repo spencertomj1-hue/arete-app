@@ -15,6 +15,7 @@ import streamlit as st
 
 from arete import regional
 from arete import store
+from arete import undo
 
 HERE = Path(__file__).parent
 
@@ -138,6 +139,8 @@ def page_daily_log():
                              placeholder=prompt_for(selected), help="The day's notes: write as much as you like.")
         if st.form_submit_button(f"Save {nice_date(selected)}", type="primary"):
             with store.db() as conn:
+                if entry:
+                    undo.checkpoint(f"Updated the log for {nice_date(selected)}")
                 store.save_entry(conn, d, mood, sleep, energy, notes.strip() or None, regional.water_in(water))
             st.toast(f"Saved {nice_date(selected)}.")
             st.rerun()   # refresh the calendar
@@ -263,7 +266,8 @@ def _habits_for(day, today):
         if habits:
             names = {name: habit_id for habit_id, name in habits}
             to_remove = st.selectbox("Remove a habit", list(names))
-            st.caption("Removing a habit also deletes its history.")
+            st.caption("Removing a habit also deletes its history (you can undo it straight after).")
             if st.button("Remove habit"):
+                undo.checkpoint(f"Removed the habit '{to_remove}' and its history")
                 store.delete_habit(names[to_remove])
                 st.rerun()

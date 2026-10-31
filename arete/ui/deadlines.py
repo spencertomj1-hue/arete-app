@@ -12,6 +12,7 @@ import streamlit as st
 
 from arete import regional
 from arete import store
+from arete import undo
 
 HOME_LIMIT = 5
 
@@ -68,10 +69,10 @@ def _edit_dialog(did):
                 store.update_deadline(did, title=title, due=due, notes=notes)
                 st.rerun()
     st.divider()
-    if st.toggle("Delete this deadline", key=f"dl_del_t_{did}"):
-        if st.button("Delete", type="primary", icon=":material/delete:", key=f"dl_del_{did}"):
-            store.delete_deadline(did)
-            st.rerun()
+    if st.button("Delete this deadline", icon=":material/delete:", key=f"dl_del_{did}"):
+        undo.checkpoint(f"Deleted the deadline '{d['title']}'")
+        store.delete_deadline(did)
+        st.rerun()
 
 
 def _toggle(did, key):

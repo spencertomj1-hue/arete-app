@@ -33,6 +33,35 @@ _timetable_component = st.components.v2.component(
 # Grid callbacks
 # ---------------------------------------------------------------------------
 
+def _overlapping(date, track, s, e):
+    """Labels of the blocks (and, in the Plan, Outlook events) a paint would cover."""
+    labels = [b["label"] for b in store.blocks_between(date, date, track)
+              if store.slot_of(b["start"]) < e and store.slot_of(b["end"]) > s]
+    if track == "plan":
+        labels += [ev["title"] for ev in store.outlook_between(date, date)
+                   if not ev["all_day"] and ev["start"] and store.slot_of(ev["start"]) < e and store.slot_of(ev["end"]) > s]
+    return labels
+
+
+def _checkpoint(op):
+    """Before a grid change that deletes or overwrites something, save an Undo point for it."""
+    from arete import undo
+    kind = op["kind"]
+    if kind == "paint":
+        s, e = store.slot_of(op["start"]), store.slot_of(op["end"])
+        covered = _overlapping(op["date"], op["track"], s, e)
+        if covered:
+            what = ", ".join(dict.fromkeys(covered))
+            undo.checkpoint(f"Erased {what}" if not op.get("block") else f"Painted over {what}")
+    elif kind == "delete":
+        b = store.get_block(op["id"])
+        undo.checkpoint(f"Deleted {b['label']}" if b else "Deleted a block")
+    elif kind == "upsert":
+        undo.checkpoint(f"Edited {op['entry'].get('label') or 'a block'}")
+    elif kind == "hide_outlook":
+        undo.checkpoint("Removed an Outlook event from the timetable")
+
+
 def apply_grid_op(op):
     """
     Save one op from the grid:
@@ -43,6 +72,7 @@ def apply_grid_op(op):
       {kind: "detach_outlook", uid}   turn it into the user's own block (id "ol:<uid>")
     Painting over an Outlook event detaches it first (store.paint), so it's trimmed like any block.
     """
+    _checkpoint(op)
     if op["kind"] == "paint":
         s, e = store.slot_of(op["start"]), store.slot_of(op["end"])
         block = op.get("block")

@@ -17,6 +17,7 @@ import streamlit as st
 
 from arete import regional
 from arete import store
+from arete import undo
 from arete import tools
 
 AUTO = "Automatic (from the activity)"
@@ -53,13 +54,17 @@ def _category_choice(label, category):
     return None
 
 
-def _call(fn, *args, **kwargs):
-    """Run a tool: a preview waits for Confirm; otherwise say what happened and refresh the page."""
+def _call(fn, *args, apply_now=False, **kwargs):
+    """Run a tool and refresh the page. A preview waits for Confirm, or with apply_now
+    (overwriting by hand) goes straight ahead with an Undo instead."""
     try:
         r = fn(*args, **kwargs)
     except tools.ToolError as e:
         st.error(_for_people(str(e)), icon=":material/error:")
         return
+    if r.pending and apply_now:
+        undo.checkpoint(r.pending.summary)
+        r = r.pending.run()
     if r.pending:
         st.session_state[PENDING] = r.pending
         st.rerun(scope="fragment")
@@ -76,6 +81,7 @@ def _confirm_box(yes="Confirm"):
     st.warning(pending.summary, icon=":material/preview:")
     a, b, _ = st.columns([1, 1, 3])
     if a.button(yes, type="primary", key="tt_tool_yes"):
+        undo.checkpoint(pending.summary)
         r = pending.run()
         st.session_state.pop(PENDING, None)
         st.toast(r.text, icon=":material/check_circle:")
@@ -110,8 +116,8 @@ def _add_block_dialog(day):
             cat = _category_choice(label, category)
             if cat is not False:
                 _call(tools.add_block, when.isoformat(), (track or "Plan").lower(), start, end, label,
-                      category=cat, details=details.strip() or None)
-    st.caption("If it overlaps blocks already there, you'll see what changes before anything is overwritten.")
+                      category=cat, details=details.strip() or None, apply_now=True)
+    st.caption("If it overlaps blocks already there, they're trimmed or replaced, and you can Undo it straight after.")
 
 
 # ---------------------------------------------------------------------------

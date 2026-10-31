@@ -14,6 +14,7 @@ import streamlit as st
 
 from arete import regional
 from arete import store
+from arete import undo
 
 HERE = Path(__file__).parent
 PAGE = "Network"
@@ -102,6 +103,7 @@ def _person_dialog(person_id):
         left, right = st.columns([6, 1], vertical_alignment="center")
         left.markdown(other["name"] + (f" · :gray[{reason}]" if reason else ""))
         if right.button("", icon=":material/link_off:", key=f"net_unlink_{other['id']}", help="Remove this connection"):
+            undo.checkpoint(f"Disconnected {p['name']} and {other['name']}")
             store.unlink_people(person_id, other["id"])
             st.rerun(scope="fragment")
     others = [o for o in store.net_people() if o["id"] != person_id and o["id"] not in {x["id"] for x, _ in links}]
@@ -131,14 +133,15 @@ def _person_dialog(person_id):
         d = store._as_date(item["date"])
         left.markdown(f"**{regional.day_month(d, year=True)}** · {item['note']}")
         if right.button("", icon=":material/delete:", key=f"net_meet_del_{item['id']}", help="Remove this"):
+            undo.checkpoint(f"Removed '{item['note']}' from {p['name']}'s history")
             store.delete_interaction(item["id"])
             st.rerun(scope="fragment")
 
     st.divider()
-    if st.toggle(f"Remove {p['name']} from the network", key=f"net_del_{person_id}"):
-        if st.button("Remove", type="primary", icon=":material/delete:", key=f"net_del_go_{person_id}"):
-            store.delete_person(person_id)
-            st.rerun()
+    if st.button(f"Remove {p['name']} from the network", icon=":material/delete:", key=f"net_del_go_{person_id}"):
+        undo.checkpoint(f"Removed {p['name']} from the network")
+        store.delete_person(person_id)
+        st.rerun()
 
 
 def _group_form(key, g=None, parent=None):
@@ -182,11 +185,11 @@ def _group_dialog(group_id):
             st.rerun()
     st.divider()
     up = store.group_path(g["parent_id"]) if g["parent_id"] else "no group"
-    if st.toggle(f"Delete {g['name']}", key=f"net_delg_{group_id}",
+    if st.button(f"Delete {g['name']}", icon=":material/delete:", key=f"net_delg_go_{group_id}",
                  help=f"Its people and sub-groups move to {up}."):
-        if st.button("Delete", type="primary", icon=":material/delete:", key=f"net_delg_go_{group_id}"):
-            store.delete_net_group(group_id)
-            st.rerun()
+        undo.checkpoint(f"Deleted the group {g['name']}")
+        store.delete_net_group(group_id)
+        st.rerun()
 
 
 # ---------------------------------------------------------------------------

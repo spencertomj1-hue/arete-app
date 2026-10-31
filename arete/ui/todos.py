@@ -50,6 +50,9 @@ def apply_op(op):
     elif kind == "move":
         store.move_todo(op["id"], op["period"])
     elif kind == "delete":
+        t = store.get_todo(op["id"])
+        from arete import undo
+        undo.checkpoint(f"Deleted the to-do '{t['title']}'" if t else "Deleted a to-do")
         store.delete_todo(op["id"])
     elif kind == "reorder":
         store.reorder_todos(op["ids"])

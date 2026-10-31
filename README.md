@@ -94,6 +94,8 @@ Claude only changes Arete's data, through a fixed set of actions. **Anything tha
 
 **Outlook calendar (optional).** Your published Outlook calendar appears in the timetable's Plan column, and you can remove or adjust any event. It's read only: nothing is ever written back to Outlook.
 
+**Undo.** Delete or overwrite something (a block, a to-do, a goal, a deadline, a person, a habit, an import...) and a bar at the bottom says what happened, with **Undo**, for two minutes.
+
 **Settings.**
 - Region: time zone (your computer's, or pick one), week starting Monday or Sunday, 12- or 24-hour clock, date format, and water in litres or US fl oz
 - Timetable hours: when your day starts and ends (07:00 to 01:00 to start with; night owls and shift workers can move it)

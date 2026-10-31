@@ -210,6 +210,7 @@ Two different things:
 
 ## 9. Gotchas
 
+- **Undo:** call `undo.checkpoint("Deleted X")` just before any delete or overwrite (UI or a confirmed Claude change); `ui/undo_bar.py` then offers Undo for 2 minutes. It restores a whole-database snapshot, so it's only offered while SQLite's change counter shows nothing else was saved since.
 - **Timetable hours:** `store.SLOTS` / `FIRST_MIN` come from settings.json `day_start` / `day_end` (`_apply_day_hours`, re-run by `save_settings`); never hard-code 36 or 07:00, and don't use them as default arguments (they'd be frozen at import). Blocks outside the hours stay in the database, hidden.
 - **Week start:** weekly to-dos are stored under the week's first day, so `store.set_week_start` moves them (±1 day) when it changes. Use `store.week_start_of(day)`, never `day.weekday()`, for week maths.
 - **Time zone:** never use `date.today()` / `datetime.now()` for the user's day: use `store.local_today()` / `store.local_now()` / `store.stamp()`. The zone is settings.json "timezone" (Settings → Region) or the computer's (`tzlocal`). The tests pin Europe/London in conftest.

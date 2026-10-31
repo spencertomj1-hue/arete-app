@@ -12,6 +12,7 @@ from html import escape
 import streamlit as st
 
 from arete import store
+from arete import undo
 
 PAGE = "Goals"                                  # sidebar label (also what "See all" switches to)
 NAMES = {"monthly": "Monthly", "yearly": "Yearly"}
@@ -102,6 +103,7 @@ def _edit_goal(g):
                 store.set_goal_progress(g["id"], progress)
             st.rerun()
         if delete.button("Delete", key=f"{key}_delete", icon=":material/delete:", width="stretch"):
+            undo.checkpoint(f"Deleted the goal '{g['title']}'")
             store.delete_goal(g["id"])
             st.rerun()
 

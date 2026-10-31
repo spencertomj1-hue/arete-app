@@ -250,6 +250,9 @@ PAGES[choice]()
 if choice != "Home" and store.ai_enabled():
     chat.render()
 
+from arete.ui import undo_bar                # "Deleted X · Undo", after a delete or overwrite
+undo_bar.render()
+
 
 @st.fragment(run_every=15 * 60)
 def _outlook_autosync():

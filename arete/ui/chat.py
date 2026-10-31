@@ -90,6 +90,7 @@ def _on_confirm():
         st.session_state["chat_notes"].append(f"The user cancelled: {pending.summary}.")
         return
     try:
+        undo.checkpoint(pending.summary)          # Claude's change can be undone too
         result = pending.run()
         _say("notice", f"✓ {result.text}")
         st.session_state["chat_notes"].append(f"The user confirmed, and it was done: {pending.summary}.")

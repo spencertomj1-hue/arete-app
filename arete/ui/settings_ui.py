@@ -20,6 +20,7 @@ from arete import outlook
 from arete import setup_checks
 from arete import regional
 from arete import store
+from arete import undo
 from arete import system
 
 STEPS = [("Welcome", ":material/waving_hand:"), ("Assistant", ":material/chat:"),
@@ -469,6 +470,7 @@ def _data_section():
         if "date" not in new.columns:
             st.error("The CSV needs a `date` column.")
         else:
+            undo.checkpoint(f"Imported {len(new)} rows" + (" (replacing everything)" if mode.startswith("Replace") else ""))
             store.save_all_data(new, replace=mode.startswith("Replace"))
             st.success(f"Imported {len(new)} rows.")
 
@@ -545,5 +547,6 @@ def _csv_section(name, slug, load, save, required, columns):
         if not set(required) <= set(new.columns):
             st.error("The CSV needs " + ", ".join(f"`{c}`" for c in required) + " columns.")
         else:
+            undo.checkpoint(f"Imported {name.lower()}" + (" (replacing them all)" if mode.startswith("Replace") else ""))
             count = save(new, replace=mode.startswith("Replace"))
             st.success(f"Imported {count} {name.lower()}.")
