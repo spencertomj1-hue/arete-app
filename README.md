@@ -10,7 +10,7 @@
 
 <p align="center">
   A personal life tracker for your Mac or Windows PC: a weekly Plan-vs-Actual timetable, a daily log
-  of mood, sleep and energy, habits with streaks, to-dos and goals, a map of the people you know, and a Claude chat box that updates it all for you.
+  of mood, sleep, energy and water, a journal, habits with streaks, to-dos and goals, a map of the people you know, reminders before things start, and a Claude chat box that updates it all for you.
 </p>
 
 <p align="center"><em>No summit, just the climb.</em></p>
@@ -58,14 +58,19 @@ It runs entirely on your computer (Mac or Windows) as a normal app. It's built w
 - **Categories:** colour-coded, with groups "Life" and "Work" to start with. Activities pick their category automatically (for example "Lunch" → Meals). You can change categories and colours by asking Claude.
 - **Moving around:** use ‹ Today › or a date picker, or swipe sideways on the trackpad.
 
-**Daily Log.** A month calendar showing each day's mood, sleep and energy. Click a day to read its notes, tick that day's habits (with current and best streaks), and save its entry. Habits are added and removed here too.
+**Daily Log.** A month calendar showing each day's mood, sleep, energy and litres of water. Click a day to read its notes, tick that day's habits (with current and best streaks), and save its entry. Habits are added and removed here too.
 
 **Network.** A map of the people you know, as a tree: you in the middle, a circle for each group branching off you, sub-groups branching off their group (e.g. Northfield → Physics Society, Robotics Lab), and people branching off the group they're in. Dashed lines join people who know each other.
 - **Adding:** tell Arete ("add Physics Society inside Northfield", "Priya is in Physics Society and knows Sam from football"), or use "Add someone" / "Add group". A group's card also has "Add person here" and "Add sub-group".
 - **Looking around:** click a person or group for its card (who they work for, a description, connections, members); click a name in a card to jump there. Drag to move things, scroll to zoom, search by name, and click a group in the legend to hide or show its whole branch.
 - **Editing:** every card has an Edit button that opens a dialog to change details, add or remove connections, move groups, or remove things.
+- **Times you've met:** log coffees, calls and catch-ups with someone (in their Edit dialog, or tell Arete "had coffee with Priya, talked about her thesis"). Their card shows when you last spoke and the latest few.
 
-**Stats.** Charts of mood, energy and sleep, plus habit completion rates.
+**Journal.** Free writing, one entry per day, with a different prompt each day to get you started. Past entries are listed below with a search box. Tell Arete "journal: ..." to add to today's entry, or ask "what did I write about Priya?".
+
+**Reminders.** A desktop notification a few minutes before each block in your Plan (and each Outlook event) starts, while Arete is open. Turn it on or off and choose how early in Settings → Reminders.
+
+**Stats.** Charts of mood, energy, sleep and water, plus habit completion rates.
 
 **Claude chat.** Type or speak what you want changed, for example:
 > "I went to the gym from 6 to 7 tonight"
@@ -78,6 +83,9 @@ It runs entirely on your computer (Mac or Windows) as a normal app. It's built w
 > "Set a goal of 12 gym sessions this month, counting my gym habit"
 > "I read 2 more books"
 > "Add Sam, a friend from uni who works at Northbank; she knows Alex from football"
+> "Had coffee with Sam, talked about her thesis"
+> "Drank 2 litres of water today"
+> "Journal: long day in the lab, but the experiment finally worked"
 
 Claude only changes Arete's data, through a fixed set of actions. **Anything that deletes or overwrites data shows a preview with Confirm / Cancel first.** Voice input is transcribed **on your computer**.
 
@@ -87,7 +95,8 @@ Claude only changes Arete's data, through a fixed set of actions. **Anything tha
 - Calendar connection
 - Claude sign-in status
 - Microphone test
-- Backups, CSV export/import (with separate to-do and goal CSVs) and the data folder
+- Reminders: on/off, how many minutes before, and a test notification
+- Backups, CSV export/import (with separate to-do and goal CSVs), journal download and the data folder
 
 ## Screenshots
 

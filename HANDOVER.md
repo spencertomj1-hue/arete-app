@@ -43,13 +43,15 @@ arete/                         The app's code, as a package (imported as `from a
   assistant.py                 Claude via claude-agent-sdk: finds the CLI, system prompt, in-process "arete" MCP server
   voice.py                     Microphone recording (sounddevice) and local transcription (faster-whisper)
   outlook.py                   Read-only Outlook import: link checks, Keychain, fetch, recurrence expansion, sync
+  notify.py                    Reminders: a background thread that notifies before Plan blocks / Outlook events start
   setup_checks.py              Logic behind the wizard/Settings: Claude status, mic test, backups, Finder
   ui/                          One module per page or section (imported as `from arete.ui import goals`, ...)
     timetable.py               Timetable page and the week/day grid's Python side
     daily_log.py               Daily Log page (month calendar, day card, the day's habits, entry form) and Home's habits
     todos.py                   Home's to-do cards
     goals.py                   Goals page and Home's goal bars (native Streamlit widgets + an HTML bar)
-    network.py                 Network page: the web's Python side, plus the add / edit dialogs
+    network.py                 Network page: the web's Python side, plus the add / edit dialogs (incl. the interaction log)
+    journal.py                 Journal page: one entry per day, a daily prompt, past entries and search
     chat.py                    The chat bar / Home ask box, and its flow (send → transcribe → Claude → rerun)
     settings_ui.py             First-run wizard and the Settings page
     sidebar_theme.py           The sidebar's look: marble background, no title, narrow, a box per menu item
@@ -73,7 +75,8 @@ tests/                         pytest + AppTest; tests/fixtures/sample.ics is a 
 
 | Table | Contents |
 |---|---|
-| `entries` | Daily log: `date` (PK), `mood` 1–5, `sleep` hours, `energy` 1–5, `notes` |
+| `entries` | Daily log: `date` (PK), `mood` 1–5, `sleep` hours, `energy` 1–5, `notes`, `water` litres (added by `_add_column`; `save_entry(water=KEEP)` leaves it alone) |
+| `journal` | `date` (PK), `text`, `updated_at`. Saving blank text deletes the day |
 | `habits`, `habit_log` | Habits, and one row per (habit, date) ticked. Cascade delete. |
 | `tt_categories` | `id`, `name`, `colour` (#RRGGBB), `text_colour` (NULL = automatic), `grp` (heading in the key), `ord` |
 | `tt_label_map` | Activity label → default category (case-insensitive lookups) |
@@ -84,6 +87,7 @@ tests/                         pytest + AppTest; tests/fixtures/sample.ics is a 
 | `todo_rollover` | Per period kind, the last period repeating to-dos were copied into (see §5b) |
 | `net_groups` | Network groups: `id`, `name` (unique, any case), `colour`, `ord`, `parent_id` (the group it's inside; NULL = top level; no loops). Seeded from `DEFAULT_NET_GROUPS` |
 | `net_people` | `id`, `name` (not unique), `description`, `works_for`, `group_id` (`ON DELETE SET NULL`), `created_at` |
+| `net_interactions` | Times the user met/spoke to someone: `id`, `person_id` (cascade), `date`, `note`, `created_at` |
 | `net_links` | Undirected connections: `a`, `b` (always `a < b`, enforced by a CHECK), `reason`. Cascade-deleted with either person |
 | `goals` | `id`, `title`, `period` (monthly/yearly), `period_start`, `target`, `unit`, `progress` (kept by hand), `habit_id` (NULL = by hand; `ON DELETE SET NULL`), `ord`, `created_at` |
 
@@ -91,7 +95,7 @@ Notes on the schema:
 - **New installs** are seeded with generic categories (groups "Life" and "Work") and activity defaults, in `DEFAULT_CATEGORIES` / `DEFAULT_LABEL_MAP`. Groups are read from the data (`store.groups()`), so a user's own groups work too.
 - **`end` is an SQL keyword** and must be quoted.
 - **Migrations:** columns added later are added by `_add_column` in `init_db`, so existing databases keep working. `_goals_became_todos` handles databases from before the to-do / goal split: their `goals` table (which held to-dos) is backed up to `backups/life-…-before-todos.db`, renamed to `todos` (with `goal_rollover` → `todo_rollover`), and its yearly to-dos dropped.
-- **`settings.json`** holds `wizard_done` and `outlook_category`. Use `store.load_settings` / `save_settings`.
+- **`settings.json`** holds `wizard_done`, `outlook_category`, `reminders` (default on) and `reminder_minutes` (default 5). Use `store.load_settings` / `save_settings`.
 
 ## 5. Timetable
 
@@ -136,6 +140,13 @@ Two different things:
 - **Cards and dialogs:** selection is local to the JS. Card buttons send `edit` `{kind: person|group, id}`, `{kind: new_person, group}` or `{kind: new_group, parent}`; `_on_edit` stores it in `net_edit`, and `render_page` pops it and opens the matching `st.dialog` once (clicks inside a dialog rerun only the dialog). Dialog buttons are never disabled: Streamlit text boxes only commit on Enter/blur, so they validate on click instead.
 - **Claude:** `add_person`, `update_person`, `connect_people`, `disconnect_people` (confirm), `delete_person` (confirm), `add_group` (with `inside`), `edit_group` (rename/recolour/move), `delete_group` (confirm; its people and sub-groups move up a level), `find_people` (lists groups as a tree). Names aren't unique: lookups match an exact name first, then part of a name, and several matches is an error that lists them. Everyone is implicitly linked to the user, so there's no "me" person.
 
+- **Interaction log:** `net_interactions`, newest first. The person dialog adds/removes entries; the card shows "Last spoke" and the latest 3 (`recent` in the component data). Claude: `log_interaction`, `person_history`; `find_people` shows the last one.
+
+## 5d. Journal and reminders
+
+- **Journal (`ui/journal.py`):** the form's key includes a hash of the saved text, so if Claude adds to the day the box shows it instead of a stale draft. Search is `LIKE` per word (wildcards escaped). Claude: `write_journal` appends a paragraph (replace=true needs confirmation), `read_journal` by day, range and/or words. Settings → Data downloads it as Markdown.
+- **Reminders (`notify.py`):** `notify.start()` in `app.py` starts one daemon thread per process (skipped when `ARETE_NO_REMINDERS` is set, as the tests do). Every 30 s `check()` reads the settings, finds Plan blocks and visible timed Outlook events from yesterday's and today's timetable days (times before 07:00 are the next calendar day) that start within `reminder_minutes` (or started under a minute ago), and announces each once (key: date|start|label). `system.notify` runs `osascript` (macOS; shows as from Script Editor), a PowerShell toast (Windows) or `notify-send` (Linux), passing the text as arguments / environment variables so nothing in it runs as code.
+
 ## 6. Outlook import (`outlook.py`)
 
 - **Read only:** nothing is ever written to Outlook. The link is only in the Keychain. **Never log or display it.** `fetch()` replaces `requests`' exceptions (which contain the URL) with safe messages, and a test checks this.
@@ -169,6 +180,8 @@ Two different things:
   - `add_block`, `update_block`, `delete_block`, `query_blocks`, `query_entries`, `get_stats`
   - `plan_time`: fits N hours of an activity into the Plan's free gaps (`store.free_runs`: around the user's blocks and visible Outlook events) between two dates, within earliest/latest, in sittings of up to `max_block_hours`, spread over evenly spaced days with a 30-minute break between sittings on the same day. Always a preview (Confirm paints them).
   - `list_categories`, `edit_category`, `set_activity_default`, `set_outlook_category`
+  - `log_day` also takes `water` (litres, the day's total; changing it needs no confirmation since it's a running total).
+  - Journal: `write_journal`, `read_journal`. Network interactions: `log_interaction`, `person_history`.
   - To-dos: `add_todo`, `complete_todo`, `uncomplete_todo`, `list_todos`, `delete_todo` (confirm first).
   - Goals: `add_goal`, `log_goal_progress`, `set_goal_progress`, `edit_goal`, `list_goals`, `delete_goal` (confirm first). Progress tools refuse habit-linked goals and point Claude at `set_habit`.
   - Both are found by id or title in the current periods: exact title, then part of a title, then the most shared words ("finish problem sheet" → "Problem sheet 4"). Several matches is an error that lists them, so Claude asks.
