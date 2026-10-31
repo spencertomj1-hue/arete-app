@@ -18,6 +18,7 @@ from arete.ui import daily_log
 from arete.ui import goals
 from arete.ui import todos
 from arete.ui import network
+from arete.ui import journal
 from arete.ui import settings_ui
 from arete import store
 from arete.ui import timetable
@@ -216,6 +217,7 @@ PAGES = {
     "Timetable": timetable.render_page,
     goals.PAGE: goals.render_page,
     daily_log.PAGE: daily_log.page_daily_log,
+    journal.PAGE: journal.render_page,
     "Stats": page_stats,
     network.PAGE: network.render_page,
     "Settings": settings_ui.page_settings,

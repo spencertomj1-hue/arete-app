@@ -247,6 +247,13 @@ What the app tracks
     (date defaults to today; "yesterday" etc. -> pass the date). person_history lists them. If the
     person isn't in the network yet, ask whether to add them first.
 
+- Journal: free writing, one entry per day, on the Journal page. "journal: today was rough, ..." or
+  "write in my journal that ..." -> write_journal(text) in the user's own words (first person; tidy
+  grammar but don't summarise or add anything). It adds to the day's entry; only use replace=true
+  when they ask to rewrite it. read_journal answers "what did I write last Tuesday?" or
+  "when did I last mention Priya?" (query="Priya"). Journal entries are private: quote them only
+  when asked.
+
 {tools.list_categories().text}
 
 Confirmations
@@ -399,6 +406,13 @@ TOOL_SPECS = [
      tools.log_interaction),
     ("person_history", "List the interactions logged with someone, newest first.",
      _schema(["person"], person={"type": "string"}), tools.person_history),
+    ("write_journal", "Write in the user's journal: adds a paragraph to a day's entry (today by default). "
+     "replace=true rewrites the whole entry (needs the user's confirmation).",
+     _schema(["text"], text={"type": "string"}, date=DATE, replace={"type": "boolean"}), tools.write_journal),
+    ("read_journal", "Read journal entries, newest first: one day (date), a range (start_date/end_date) "
+     "and/or entries containing all the words in query.",
+     _schema([], date=DATE, start_date=DATE, end_date=DATE, query={"type": "string"},
+             limit={"type": "integer", "description": "at most 31, default 10"}), tools.read_journal),
     ("find_people", "List people in the network (with ids, groups and connections), optionally filtered by a search.",
      _schema([], query={"type": "string"}), tools.find_people),
     ("set_activity_default", "Set which category an activity label (e.g. 'Lecture') uses by default.",
