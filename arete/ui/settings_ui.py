@@ -342,7 +342,7 @@ def _data_section():
 
     st.subheader("Journal")
     entries = store.journal_entries()
-    st.write(f"Your journal as one text file, oldest first ({len(entries)} entr{'y' if len(entries) == 1 else 'ies'}).")
+    st.write(f"Your journal (the Daily Log's notes) as one text file, oldest first ({len(entries)} entr{'y' if len(entries) == 1 else 'ies'}).")
     text = "\n\n".join(f"# {e['date']}\n\n{e['text']}" for e in reversed(entries))
     st.download_button("Download journal", text, file_name=f"arete_journal_{date.today()}.md",
                        mime="text/markdown", icon=":material/download:", disabled=not entries)

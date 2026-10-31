@@ -131,7 +131,7 @@ def log_day(date, mood=None, sleep=None, energy=None, notes=None, append_notes=F
     if notes:
         notes = notes.strip()
         if append_notes and old.get("notes"):
-            new["notes"] = f"{old['notes']}\n{notes}"
+            new["notes"] = f"{old['notes']}\n\n{notes}"
             changes.append("notes added to")
         elif old.get("notes") and old["notes"] != notes:
             overwrites.append(f"notes replaced (were: “{old['notes']}”)")
@@ -992,7 +992,7 @@ def person_history(person, limit=20):
 # ---------------------------------------------------------------------------
 
 def write_journal(text, date=None, replace=False, confirmed=False):
-    """Add a paragraph to a day's journal (today by default); replace=True rewrites the whole entry."""
+    """Add a paragraph to a day's notes / journal entry (today by default); replace=True rewrites the whole entry."""
     day = _day(date) if date else store.london_today().isoformat()
     text = str(text or "").strip()
     if not text:

@@ -7,6 +7,7 @@ saves the entry for the selected day.
 Habits: tick habits for a day, see streaks, add/remove habits.
 """
 
+import hashlib
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -26,6 +27,27 @@ _calendar_component = st.components.v2.component(
 
 def nice_date(d):
     return f"{d:%A} {d.day} {d:%B}"
+
+
+# The journal box's placeholder: the same prompt all day, a different one each day.
+PROMPTS = [
+    "What went well today, and why?",
+    "What's on your mind right now?",
+    "What did you learn today?",
+    "What are you grateful for?",
+    "What drained your energy today? What gave you energy?",
+    "What would make tomorrow a good day?",
+    "Who did you enjoy spending time with?",
+    "What's something you're putting off, and what's the first small step?",
+    "What surprised you today?",
+    "How did you look after yourself today?",
+    "What's worrying you, and how much of it is in your control?",
+    "What are you looking forward to?",
+]
+
+
+def prompt_for(day):
+    return PROMPTS[day.toordinal() % len(PROMPTS)]
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +106,7 @@ def page_daily_log():
             b.metric("Sleep", f"{entry['sleep']:g} h" if entry.get("sleep") is not None else "–")
             c.metric("Energy", f"{entry['energy']}/5" if entry.get("energy") else "–")
             w.metric("Water", f"{entry['water']:g} L" if entry.get("water") is not None else "–")
-            st.markdown(entry["notes"] if entry.get("notes") else "*No notes.*")
+            st.markdown(entry["notes"].replace("\n", "  \n") if entry.get("notes") else "*No journal entry.*")
         else:
             st.caption("Nothing logged for this day yet.")
 
@@ -95,16 +117,19 @@ def page_daily_log():
         st.info("You can't log a day that hasn't happened yet. Pick today or an earlier day.")
         return
     st.subheader("Save entry")
-    # Widget keys include the date so the form reloads when you pick another day.
-    with st.form(f"entry_form_{d}"):
-        mood = st.slider("Mood", 1, 5, int(entry.get("mood") or 3), key=f"mood_{d}")
+    # Widget keys include the date, so the form reloads when you pick another day, and a hash of the
+    # saved entry, so it shows what Claude just wrote instead of a stale draft.
+    v = f"{d}_{hashlib.sha1(repr(sorted(entry.items())).encode('utf-8')).hexdigest()[:8]}"
+    with st.form(f"entry_form_{v}"):
+        mood = st.slider("Mood", 1, 5, int(entry.get("mood") or 3), key=f"mood_{v}")
         sleep = st.number_input(
-            "Sleep (hours)", 0.0, 24.0, float(entry.get("sleep") or 7.0), step=0.5, key=f"sleep_{d}"
+            "Sleep (hours)", 0.0, 24.0, float(entry.get("sleep") or 7.0), step=0.5, key=f"sleep_{v}"
         )
-        energy = st.slider("Energy", 1, 5, int(entry.get("energy") or 3), key=f"energy_{d}")
+        energy = st.slider("Energy", 1, 5, int(entry.get("energy") or 3), key=f"energy_{v}")
         water = st.number_input("Water (litres)", 0.0, 15.0, entry.get("water"), step=0.25, format="%.2f",
-                                placeholder="e.g. 2", key=f"water_{d}", help="Leave empty if you didn't track it.")
-        notes = st.text_area("Notes", entry.get("notes") or "", key=f"notes_{d}")
+                                placeholder="e.g. 2", key=f"water_{v}", help="Leave empty if you didn't track it.")
+        notes = st.text_area("Journal", entry.get("notes") or "", height=260, key=f"notes_{v}",
+                             placeholder=prompt_for(selected), help="The day's notes: write as much as you like.")
         if st.form_submit_button(f"Save {nice_date(selected)}", type="primary"):
             with store.db() as conn:
                 store.save_entry(conn, d, mood, sleep, energy, notes.strip() or None, water)
@@ -112,6 +137,31 @@ def page_daily_log():
             st.rerun()   # refresh the calendar
     if entry:
         st.caption("An entry already exists for this day — saving will update it.")
+
+    _past_entries()
+
+
+def _open_day(day):
+    st.session_state["log_day"] = day
+    st.session_state["log_month"] = day.replace(day=1)
+
+
+def _past_entries():
+    """Earlier journal entries (the days' notes), newest first, with a search box."""
+    st.subheader("Past entries", anchor=False)
+    query = st.text_input("Search", placeholder="Search your journal", label_visibility="collapsed",
+                          key="journal_search")
+    entries = store.journal_entries(query or None, limit=None if query else 30)
+    if not entries:
+        st.caption("No matches." if query else "Nothing written yet.")
+    for e in entries:
+        d = store._as_date(e["date"])
+        first_line = e["text"].strip().splitlines()[0]
+        preview = first_line[:70] + ("…" if len(first_line) > 70 else "")
+        with st.expander(f"**{d:%a} {d.day} {d:%b %Y}** · {preview}", expanded=bool(query) and len(entries) <= 3):
+            st.markdown(e["text"].replace("\n", "  \n"))
+            st.button("Open this day", key=f"journal_open_{e['date']}", on_click=_open_day, args=(d,),
+                      icon=":material/edit:")
 
 
 # ---------------------------------------------------------------------------

@@ -227,13 +227,12 @@ def init_db():
                 created_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS net_interactions_person ON net_interactions (person_id, date);
-            CREATE TABLE IF NOT EXISTS journal (
-                date TEXT PRIMARY KEY, text TEXT NOT NULL, updated_at TEXT NOT NULL);
             """
         )
         # Columns added after the first release.
         _add_column(conn, "tt_entries", "details", "TEXT")
         _add_column(conn, "entries", "water", "REAL")
+        _journal_became_notes(conn)
         _add_column(conn, "tt_outlook", "description", "TEXT")
         _add_column(conn, "net_groups", "parent_id", "TEXT")
         if conn.execute("SELECT COUNT(*) FROM tt_categories").fetchone()[0] == 0:
@@ -339,26 +338,37 @@ def entries_between(first, last):
 
 
 # ---------------------------------------------------------------------------
-# Journal: free writing, one entry per day
+# Journal: a day's notes are its journal entry (entries.notes)
 # ---------------------------------------------------------------------------
 
+def _journal_became_notes(conn):
+    """Databases from when the journal had its own table: fold each entry into that day's notes."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'journal'").fetchone():
+        return
+    for day, text in conn.execute("SELECT date, text FROM journal ORDER BY date").fetchall():
+        row = conn.execute("SELECT notes FROM entries WHERE date = ?", (day,)).fetchone()
+        old = (row[0] or "").strip() if row else ""
+        new = text if not old or text.strip() in old else f"{old}\n\n{text}"
+        conn.execute("INSERT INTO entries (date, notes) VALUES (?, ?) "
+                     "ON CONFLICT(date) DO UPDATE SET notes = excluded.notes", (day, new))
+    conn.execute("DROP TABLE journal")
+
+
 def get_journal(day):
-    """The journal text for a day ('' if none)."""
+    """A day's notes / journal entry ('' if none)."""
     with db() as conn:
-        row = conn.execute("SELECT text FROM journal WHERE date = ?", (_as_date(day).isoformat(),)).fetchone()
-    return row[0] if row else ""
+        row = conn.execute("SELECT notes FROM entries WHERE date = ?", (_as_date(day).isoformat(),)).fetchone()
+    return (row[0] or "") if row else ""
 
 
 def save_journal(day, text):
-    """Set a day's journal text; blank text deletes the entry."""
-    day, text = _as_date(day).isoformat(), str(text or "").strip()
+    """Set a day's notes / journal entry, leaving mood, sleep etc. alone; blank text clears it."""
+    day, text = _as_date(day).isoformat(), str(text or "").strip() or None
     with db() as conn:
-        if not text:
-            conn.execute("DELETE FROM journal WHERE date = ?", (day,))
-        else:
-            conn.execute("INSERT INTO journal VALUES (?, ?, ?) ON CONFLICT(date) DO UPDATE SET "
-                         "text = excluded.text, updated_at = excluded.updated_at",
-                         (day, text, datetime.now(TZ).isoformat(timespec="seconds")))
+        conn.execute("INSERT INTO entries (date, notes) VALUES (?, ?) "
+                     "ON CONFLICT(date) DO UPDATE SET notes = excluded.notes", (day, text))
+        conn.execute("DELETE FROM entries WHERE date = ? AND mood IS NULL AND sleep IS NULL "
+                     "AND energy IS NULL AND notes IS NULL AND water IS NULL", (day,))
 
 
 def append_journal(day, text):
@@ -374,9 +384,9 @@ def append_journal(day, text):
 
 def journal_entries(query=None, first=None, last=None, limit=None):
     """[{date, text}] newest first; `query` matches words anywhere (any case), dates are inclusive."""
-    sql, params = "SELECT date, text FROM journal WHERE 1 = 1", []
+    sql, params = "SELECT date, notes FROM entries WHERE TRIM(COALESCE(notes, '')) != ''", []
     for word in str(query or "").split():
-        sql += " AND text LIKE ? ESCAPE '\\'"
+        sql += " AND notes LIKE ? ESCAPE '\\'"
         params.append("%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
     if first:
         sql += " AND date >= ?"; params.append(_as_date(first).isoformat())

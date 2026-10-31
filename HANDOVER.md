@@ -47,11 +47,10 @@ arete/                         The app's code, as a package (imported as `from a
   setup_checks.py              Logic behind the wizard/Settings: Claude status, mic test, backups, Finder
   ui/                          One module per page or section (imported as `from arete.ui import goals`, ...)
     timetable.py               Timetable page and the week/day grid's Python side
-    daily_log.py               Daily Log page (month calendar, day card, the day's habits, entry form) and Home's habits
+    daily_log.py               Daily Log page (month calendar, day card, the day's habits, entry form with the journal box, past entries) and Home's habits
     todos.py                   Home's to-do cards
     goals.py                   Goals page and Home's goal bars (native Streamlit widgets + an HTML bar)
     network.py                 Network page: the web's Python side, plus the add / edit dialogs (incl. the interaction log)
-    journal.py                 Journal page: one entry per day, a daily prompt, past entries and search
     chat.py                    The chat bar / Home ask box, and its flow (send → transcribe → Claude → rerun)
     settings_ui.py             First-run wizard and the Settings page
     sidebar_theme.py           The sidebar's look: marble background, no title, narrow, a box per menu item
@@ -76,7 +75,6 @@ tests/                         pytest + AppTest; tests/fixtures/sample.ics is a 
 | Table | Contents |
 |---|---|
 | `entries` | Daily log: `date` (PK), `mood` 1–5, `sleep` hours, `energy` 1–5, `notes`, `water` litres (added by `_add_column`; `save_entry(water=KEEP)` leaves it alone) |
-| `journal` | `date` (PK), `text`, `updated_at`. Saving blank text deletes the day |
 | `habits`, `habit_log` | Habits, and one row per (habit, date) ticked. Cascade delete. |
 | `tt_categories` | `id`, `name`, `colour` (#RRGGBB), `text_colour` (NULL = automatic), `grp` (heading in the key), `ord` |
 | `tt_label_map` | Activity label → default category (case-insensitive lookups) |
@@ -144,7 +142,7 @@ Two different things:
 
 ## 5d. Journal and reminders
 
-- **Journal (`ui/journal.py`):** the form's key includes a hash of the saved text, so if Claude adds to the day the box shows it instead of a stale draft. Search is `LIKE` per word (wildcards escaped). Claude: `write_journal` appends a paragraph (replace=true needs confirmation), `read_journal` by day, range and/or words. Settings → Data downloads it as Markdown.
+- **Journal = the day's notes (`entries.notes`):** `get_journal` / `save_journal` / `append_journal` / `journal_entries` work on that column (`save_journal` leaves the numbers alone and drops a row left empty). Databases from when the journal had its own `journal` table get it folded into notes by `_journal_became_notes` (appended unless already there) and the table dropped. In the Daily Log the form's widget keys include a hash of the saved entry, so if Claude adds to the day the box shows it instead of a stale draft. Search is `LIKE` per word (wildcards escaped). Claude: `write_journal` appends a paragraph (replace=true needs confirmation), `read_journal` by day, range and/or words. Settings → Data downloads it as Markdown.
 - **Reminders (`notify.py`):** `notify.start()` in `app.py` starts one daemon thread per process (skipped when `ARETE_NO_REMINDERS` is set, as the tests do). Every 30 s `check()` reads the settings, finds Plan blocks and visible timed Outlook events from yesterday's and today's timetable days (times before 07:00 are the next calendar day) that start within `reminder_minutes` (or started under a minute ago), and announces each once (key: date|start|label). `system.notify` runs `osascript` (macOS; shows as from Script Editor), a PowerShell toast (Windows) or `notify-send` (Linux), passing the text as arguments / environment variables so nothing in it runs as code.
 
 ## 6. Outlook import (`outlook.py`)

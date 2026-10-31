@@ -47,7 +47,7 @@ def test_log_day_append_notes_needs_no_confirm(tools, store):
     tools.log_day(DAY, notes="Gym")
     r = tools.log_day(DAY, notes="Cinema", append_notes=True)
     assert r.pending is None
-    assert store.get_entry(DAY)["notes"] == "Gym\nCinema"
+    assert store.get_entry(DAY)["notes"] == "Gym\n\nCinema"
 
 
 def test_log_day_replacing_notes_needs_confirm(tools, store):

@@ -66,7 +66,7 @@ It runs entirely on your computer (Mac or Windows) as a normal app. It's built w
 - **Editing:** every card has an Edit button that opens a dialog to change details, add or remove connections, move groups, or remove things.
 - **Times you've met:** log coffees, calls and catch-ups with someone (in their Edit dialog, or tell Arete "had coffee with Priya, talked about her thesis"). Their card shows when you last spoke and the latest few.
 
-**Journal.** Free writing, one entry per day, with a different prompt each day to get you started. Past entries are listed below with a search box. Tell Arete "journal: ..." to add to today's entry, or ask "what did I write about Priya?".
+**Journal (in the Daily Log).** Each day's notes are its journal entry: a big writing box with a different prompt each day to get you started, and past entries listed below with a search box. Tell Arete "journal: ..." to add to today's entry, or ask "what did I write about Priya?".
 
 **Reminders.** A desktop notification a few minutes before each block in your Plan (and each Outlook event) starts, while Arete is open. Turn it on or off and choose how early in Settings → Reminders.
 
