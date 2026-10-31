@@ -75,6 +75,8 @@ It runs entirely on your computer (Mac or Windows) as a normal app. It's built w
 
 **Stats.** Charts of mood, energy, sleep and water, plus habit completion rates.
 
+**Weekly review.** The first time you open Arete after 7pm on Sunday, your week pops up: how much of your Plan you followed, time planned vs done per category, mood, sleep, energy and water against the week before, habits on target, to-dos, deadlines met and coming up, people you saw and your journal, with two questions to reflect on. Past reviews are at the bottom of Stats.
+
 **Claude assistant (optional).** Everything above works by hand. If you like, switch on the assistant (during setup, or in Settings → Assistant) for a chat box where you type or speak what you want changed, for example:
 > "I went to the gym from 6 to 7 tonight"
 > "Plan a lecture 9 till 11 tomorrow"

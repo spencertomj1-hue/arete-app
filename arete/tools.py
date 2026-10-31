@@ -1130,3 +1130,14 @@ def read_journal(date=None, start_date=None, end_date=None, query=None, limit=10
     if not rows:
         return Result("No journal entries found.")
     return Result("\n\n".join(f"## {nice_day(r['date'])} ({r['date']})\n{r['text']}" for r in rows))
+
+
+# ---------------------------------------------------------------------------
+# Weekly review
+# ---------------------------------------------------------------------------
+
+def weekly_review(date=None):
+    """The main numbers for the week containing `date` (default: the latest review week)."""
+    from arete import review
+    first = store.week_start_of(_day(date)) if date else review.due_week()
+    return Result(review.as_text(review.summary(first)))

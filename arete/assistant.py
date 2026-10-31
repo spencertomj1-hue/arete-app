@@ -211,6 +211,8 @@ What the app tracks
     into their own block and changes it, delete_block removes it from Arete's timetable (both need the
     user's confirmation), and adding a block over one trims it. None of this ever changes Outlook.
 
+- Weekly review: "how did my week go?" / "review last week" -> weekly_review (date = a day in that week).
+  Give a short, honest summary with one or two observations; don't list every number.
 - Deadlines: things due on a date ("essay due Friday", "apply for the internship by 15 Nov") ->
   add_deadline(title, due). They show on Home with a countdown. complete_deadline ticks one off;
   edit_deadline changes it; delete_deadline needs confirmation. To make time for one, use plan_time
@@ -358,6 +360,10 @@ TOOL_SPECS = [
      tools.edit_category),
     ("set_outlook_category", "Set which category (and so colour) Outlook calendar events use.",
      _schema(["category"], category={"type": "string"}), tools.set_outlook_category),
+    ("weekly_review", "The week's main numbers: time planned vs done per category, how much of the Plan was "
+     "followed, daily-log averages vs the week before, habits, to-dos, deadlines, people seen, journal count, and the "
+     "user's reflections. Default: the latest finished week (the Sunday-evening review).",
+     _schema([], date={**DATE, "description": "any day in the week"}), tools.weekly_review),
     ("add_deadline", "Add a deadline: something due on a date.",
      _schema(["title", "due"], title={"type": "string"}, due=DATE, notes={"type": "string"}), tools.add_deadline),
     ("list_deadlines", "List deadlines, soonest first (with ids and countdowns).",

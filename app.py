@@ -17,6 +17,7 @@ from arete.ui import chat
 from arete.ui import daily_log
 from arete.ui import goals
 from arete.ui import deadlines
+from arete.ui import review as review_ui
 from arete.ui import todos
 from arete.ui import network
 from arete.ui import settings_ui
@@ -171,6 +172,9 @@ def page_stats():
         fig.update_yaxes(range=[0, 100], dtick=20, ticksuffix="%")
         st.plotly_chart(fig, width="stretch")
 
+    st.divider()
+    review_ui.history()                        # weekly reviews, newest first (at the bottom of Stats)
+
 
 # ---------------------------------------------------------------------------
 # App entry point
@@ -261,6 +265,7 @@ def update_banner():
 
 
 update_banner()
+review_ui.maybe_show()                         # Sunday from 7pm: the week's review pops up once
 PAGES[choice]()
 
 # The Claude chat bar, pinned to the bottom of every page (Home has it inline).
