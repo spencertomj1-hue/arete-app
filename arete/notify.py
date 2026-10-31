@@ -1,6 +1,7 @@
 """
 Desktop reminders: a notification a few minutes before each block in the Plan
-(and each visible Outlook event) starts.
+(and each visible Outlook event) starts. The same background thread also makes
+the daily automatic backup (setup_checks.auto_backup_if_due).
 
 A background thread, started once per app process from app.py, checks every 30
 seconds. Settings (settings.json): "reminders" (on/off, default on) and
@@ -115,4 +116,9 @@ def _loop():
             check(sent)
         except Exception:                      # a bad check must never kill the thread
             log.exception("Reminder check failed")
+        try:
+            from arete import setup_checks     # the daily automatic backup rides on the same thread
+            setup_checks.auto_backup_if_due()
+        except Exception:
+            log.exception("Automatic backup failed")
         time.sleep(CHECK_EVERY)

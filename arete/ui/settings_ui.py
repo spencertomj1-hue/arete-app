@@ -10,6 +10,7 @@ Arete works by hand, and switching it on adds the chat box and voice input.
 """
 
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -370,6 +371,7 @@ def _data_section():
     backups = setup_checks.list_backups()
     st.caption(f"{len(backups)} backup{'s' if len(backups) != 1 else ''}"
                + (f", latest {backups[0].name}" if backups else "") + ".")
+    _backup_settings()
 
     st.subheader("Export")
     st.write("Your daily log and habits as one CSV: one row per date, one column per habit.")
@@ -411,6 +413,44 @@ def _data_section():
         "month or year); optional `id`, `unit`, `progress`, `habit` (a habit's name, to count its ticks), "
         "`ord` and `created_at`.",
     )
+
+
+def _backup_settings():
+    """Automatic daily backups, and where backups go."""
+    st.subheader("Automatic backups")
+    on, keep = setup_checks.auto_backup_settings()
+    new_on = st.toggle("Back up automatically once a day", value=on, key="backup_auto",
+                       help=f"While Arete is open. Keeps the newest {keep}; older ones are deleted.")
+    new_keep = st.columns([1, 3])[0].number_input("Backups to keep", 3, 365, keep, step=1, key="backup_keep",
+                                                  disabled=not new_on)
+    if (new_on, new_keep) != (on, keep):
+        store.save_settings(auto_backup=new_on, backup_keep=int(new_keep))
+        st.toast("Saved", icon=":material/check_circle:")
+
+    folder = setup_checks.backups_dir()
+    st.markdown(f"Backups go to :material/folder: `{folder}`")
+    clouds = setup_checks.cloud_folders()
+    if clouds:
+        st.caption("Keep them in a cloud folder so they survive a lost or broken computer:")
+        cols = st.columns(len(clouds) + 1)
+        for col, (name, path) in zip(cols, clouds.items()):
+            if col.button(f"Use {name}", key=f"backup_cloud_{name}", icon=":material/cloud:", disabled=path == folder):
+                setup_checks.set_backups_dir(path)
+                st.rerun()
+    with st.form("backup_folder_form", border=False):
+        a, b = st.columns([4, 1], vertical_alignment="bottom")
+        typed = a.text_input("Or another folder", placeholder=str(Path.home() / "Backups" / "Arete"),
+                             help="The whole path to a folder. It's created if needed.")
+        if b.form_submit_button("Use this folder"):
+            try:
+                setup_checks.set_backups_dir(typed)
+                st.rerun()
+            except ValueError as e:
+                st.error(str(e))
+    if folder != setup_checks.default_backups_dir():
+        if st.button("Back to the default folder", key="backup_default", icon=":material/undo:"):
+            setup_checks.set_backups_dir(None)
+            st.rerun()
 
 
 def _csv_section(name, slug, load, save, required, columns):

@@ -6,10 +6,11 @@ microphone work, app settings (settings.json), backups and opening folders.
 
 import json
 import os
+import re
 import sqlite3
 import subprocess
 import time
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import numpy as np
@@ -103,8 +104,74 @@ def speech_model_downloaded():
 # Data: backups and folders
 # ---------------------------------------------------------------------------
 
-def backups_dir():
+BACKUP_KEEP = 30                                   # automatic backups kept (one a day)
+_AUTO = re.compile(r"life-(\d{4}-\d{2}-\d{2})-\d{6}\.db")   # a plain backup (not e.g. "-before-todos")
+
+
+def default_backups_dir():
     return store.DATA_DIR / "backups"
+
+
+def backups_dir():
+    """settings.json "backup_folder" if chosen (e.g. in iCloud Drive / OneDrive), else data folder/backups."""
+    chosen = store.load_settings().get("backup_folder")
+    return Path(chosen).expanduser() if chosen else default_backups_dir()
+
+
+def set_backups_dir(path):
+    """Use this folder for backups (None = the default). Raises ValueError if it can't be written to."""
+    if not path or not str(path).strip():
+        store.save_settings(backup_folder=None)
+        return default_backups_dir()
+    folder = Path(str(path).strip()).expanduser()
+    if not folder.is_absolute():
+        raise ValueError("Give the whole path, e.g. " + str(Path.home() / "Backups"))
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / ".arete-write-test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+    except OSError as e:
+        raise ValueError(f"Arete can't save backups there ({e.strerror or e}).")
+    store.save_settings(backup_folder=str(folder))
+    return folder
+
+
+def cloud_folders():
+    """{"iCloud Drive": path, "OneDrive": path, ...} for cloud folders on this computer, as backup suggestions."""
+    found = {}
+    icloud = Path.home() / "Library" / "Mobile Documents" / "com~apple~CloudDocs"
+    if icloud.is_dir():
+        found["iCloud Drive"] = icloud / "Arete backups"
+    for var in ("OneDrive", "OneDriveConsumer", "OneDriveCommercial"):
+        if os.environ.get(var) and Path(os.environ[var]).is_dir():
+            found["OneDrive"] = Path(os.environ[var]) / "Arete backups"
+            break
+    for name in ("Google Drive", "My Drive", "Dropbox"):
+        if (Path.home() / name).is_dir():
+            found[name] = Path.home() / name / "Arete backups"
+    return found
+
+
+def auto_backup_settings():
+    s = store.load_settings()
+    return bool(s.get("auto_backup", True)), int(s.get("backup_keep", BACKUP_KEEP))
+
+
+def auto_backup_if_due(today=None):
+    """Once a day (if switched on): back up, then keep only the newest `backup_keep` plain backups.
+    Returns the new backup's path, or None if one was already made today."""
+    on, keep = auto_backup_settings()
+    if not on or not store.DB_PATH.exists():
+        return None
+    today = (today or date.today()).isoformat()
+    if any((m := _AUTO.fullmatch(p.name)) and m.group(1) == today for p in list_backups()):
+        return None
+    made = backup_now()
+    plain = [p for p in list_backups() if _AUTO.fullmatch(p.name)]      # newest first
+    for old in plain[max(keep, 1):]:
+        old.unlink(missing_ok=True)
+    return made
 
 
 def backup_now():

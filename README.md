@@ -100,6 +100,7 @@ Claude only changes Arete's data, through a fixed set of actions. **Anything tha
 - Claude sign-in status
 - Microphone test
 - Reminders: on/off, how many minutes before, and a test notification
+- Automatic daily backups (keeps the last 30) to a folder you choose, e.g. iCloud Drive or OneDrive
 - Backups, CSV export/import (with separate to-do and goal CSVs), journal download and the data folder
 
 ## Screenshots

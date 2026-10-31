@@ -212,3 +212,32 @@ def test_appearance_setting(store):
     assert not at.exception and store.load_settings()["theme"] == "Dark" and appearance.mode() == "Dark"
     store.save_settings(theme="Purple")                         # anything odd falls back to System
     assert appearance.mode() == "System"
+
+
+def test_automatic_backups(store, tmp_path):
+    from datetime import date as d
+    from arete import setup_checks
+    folder = tmp_path / "cloud" / "Arete backups"
+    assert setup_checks.set_backups_dir(str(folder)) == folder and setup_checks.backups_dir() == folder
+    made = setup_checks.auto_backup_if_due()
+    assert made and made.parent == folder
+    assert setup_checks.auto_backup_if_due() is None                 # one a day
+    # Keeps only the newest N plain backups; others (e.g. -before-todos) are left alone.
+    for day in range(1, 8):
+        (folder / f"life-2026-09-0{day}-120000.db").write_bytes(b"x")
+    (folder / "life-2026-01-01-120000-before-todos.db").write_bytes(b"x")
+    store.save_settings(backup_keep=3)
+    for p in folder.glob("life-*.db"):                               # pretend today's isn't made yet
+        if p.name.startswith(f"life-{d.today().isoformat()}"):
+            p.unlink()
+    setup_checks.auto_backup_if_due()
+    names = sorted(p.name for p in folder.glob("life-*.db"))
+    assert len([n for n in names if "before" not in n]) == 3 and "life-2026-01-01-120000-before-todos.db" in names
+    store.save_settings(auto_backup=False)
+    for p in folder.glob(f"life-{d.today().isoformat()}*"):
+        p.unlink()
+    assert setup_checks.auto_backup_if_due() is None                 # switched off
+    with pytest.raises(ValueError):
+        setup_checks.set_backups_dir("relative/path")
+    setup_checks.set_backups_dir(None)
+    assert setup_checks.backups_dir() == store.DATA_DIR / "backups"
