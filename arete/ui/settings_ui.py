@@ -304,7 +304,7 @@ def _data_section():
     st.subheader("Import")
     st.write(
         f"Use the same format as the export: a `date` column (YYYY-MM-DD), optional "
-        f"`mood`, `sleep`, `energy`, `notes` columns, and `{store.HABIT_PREFIX}<name>` columns "
+        f"`mood`, `sleep`, `energy`, `water` (litres), `notes` columns, and `{store.HABIT_PREFIX}<name>` columns "
         f"containing true/false or 1/0."
     )
     uploaded = st.file_uploader("CSV file", type="csv")

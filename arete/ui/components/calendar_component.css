@@ -79,3 +79,4 @@ button { font: inherit; color: inherit; }
 .stat.mood { color: var(--c, var(--muted)); font-weight: 600; }
 .stat.sleep svg { fill: currentColor; stroke: none; }
 .stat.energy svg { fill: currentColor; stroke: none; }
+.stat.water svg { fill: currentColor; stroke: none; }

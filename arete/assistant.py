@@ -174,7 +174,9 @@ Work out relative dates ("tomorrow", "next Tuesday", "last night") from this, an
 dates to tools as YYYY-MM-DD. Weeks start on Monday.
 
 What the app tracks
-- Daily log: per date, mood 1-5, sleep hours, energy 1-5 and free-text notes (log_day).
+- Daily log: per date, mood 1-5, sleep hours, energy 1-5, water drunk (litres) and free-text notes
+  (log_day). "drank 2 litres today" -> water=2; a 500 ml bottle is 0.5; glasses are about 0.25 L.
+  water is the day's total: for "another 500 ml", check the day first (query_entries) and add to it.
   Use append_notes=true to add to existing notes rather than replace them.
 - Habits: named habits ticked per day, with streaks (set_habit, add_habit, list_habits).
   Only add a new habit if the user clearly asks for one.
@@ -290,11 +292,12 @@ GOAL_REF = {"goal": {"type": "string", "description": "the goal's title (or part
             "period": GOAL_PERIOD, "date": {**DATE, "description": "a day in the goal's month/year, if not the current one"}}
 
 TOOL_SPECS = [
-    ("log_day", "Set mood/sleep/energy/notes for a date. Fields not given are left as they are.",
+    ("log_day", "Set mood/sleep/energy/water/notes for a date. Fields not given are left as they are.",
      _schema(["date"], date=DATE,
              mood={"type": "integer", "minimum": 1, "maximum": 5},
              sleep={"type": "number", "description": "hours slept"},
              energy={"type": "integer", "minimum": 1, "maximum": 5},
+             water={"type": "number", "description": "litres of water drunk that day (the total)"},
              notes={"type": "string"},
              append_notes={"type": "boolean", "description": "add to existing notes instead of replacing"}),
      tools.log_day),

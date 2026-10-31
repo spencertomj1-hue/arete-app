@@ -113,17 +113,18 @@ def page_stats():
     stats = get_stats(periods[period])
     entries = entries_between(stats["start"], stats["end"])
     entries["date"] = pd.to_datetime(entries["date"])
-    for col in ("mood", "sleep", "energy"):
+    for col in ("mood", "sleep", "energy", "water"):
         entries[col] = pd.to_numeric(entries[col])
 
     # --- Averages ---
     def fmt(value, unit=""):
         return f"{value:.1f}{unit}" if value is not None else "–"
 
-    a, b, c = st.columns(3)
+    a, b, c, d = st.columns(4)
     a.metric("Avg mood", fmt(stats["avg_mood"]))
     b.metric("Avg sleep", fmt(stats["avg_sleep"], " h"))
     c.metric("Avg energy", fmt(stats["avg_energy"]))
+    d.metric("Avg water", fmt(stats["avg_water"], " L"))
 
     # --- Line charts ---
     if entries.empty:
@@ -145,6 +146,14 @@ def page_stats():
         fig.update_yaxes(range=[0, top], dtick=1 if top <= 12 else 2, tickformat="d")
         _date_axis(fig, stats)
         st.plotly_chart(fig, width="stretch")
+
+        water = entries.dropna(subset=["water"])
+        if not water.empty:
+            fig = px.bar(water, x="date", y="water", title="Water", labels={"water": "Litres"},
+                         color_discrete_sequence=["#3E8EF7"])
+            fig.update_yaxes(rangemode="tozero")
+            _date_axis(fig, stats)
+            st.plotly_chart(fig, width="stretch")
 
     # --- Habit completion % ---
     if stats["habit_completion_pct"]:

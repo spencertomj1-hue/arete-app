@@ -100,7 +100,8 @@ def init_db():
                 mood   INTEGER,            -- 1-5
                 sleep  REAL,               -- hours
                 energy INTEGER,            -- 1-5
-                notes  TEXT
+                notes  TEXT,
+                water  REAL                -- litres drunk
             );
 
             -- The list of habits you track
@@ -232,6 +233,7 @@ def init_db():
         )
         # Columns added after the first release.
         _add_column(conn, "tt_entries", "details", "TEXT")
+        _add_column(conn, "entries", "water", "REAL")
         _add_column(conn, "tt_outlook", "description", "TEXT")
         _add_column(conn, "net_groups", "parent_id", "TEXT")
         if conn.execute("SELECT COUNT(*) FROM tt_categories").fetchone()[0] == 0:
@@ -316,17 +318,18 @@ def get_entry(day):
     return dict(row) if row else {}
 
 
-def save_entry(conn, day, mood, sleep, energy, notes):
+KEEP = object()   # e.g. save_entry(water=KEEP), update_goal: leave this field as it is
+
+
+def save_entry(conn, day, mood, sleep, energy, notes, water=KEEP):
     """Insert or update the entry for a date (uses an open connection)."""
+    cols = {"mood": mood, "sleep": sleep, "energy": energy, "notes": notes}
+    if water is not KEEP:
+        cols["water"] = water
     conn.execute(
-        """
-        INSERT INTO entries (date, mood, sleep, energy, notes)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(date) DO UPDATE SET
-            mood = excluded.mood, sleep = excluded.sleep,
-            energy = excluded.energy, notes = excluded.notes
-        """,
-        (day, mood, sleep, energy, notes),
+        f"INSERT INTO entries (date, {', '.join(cols)}) VALUES (?{', ?' * len(cols)}) "
+        f"ON CONFLICT(date) DO UPDATE SET {', '.join(f'{c} = excluded.{c}' for c in cols)}",
+        (day, *cols.values()),
     )
 
 
@@ -532,8 +535,9 @@ def save_all_data(df, replace=False):
             sleep = _clean(row.get("sleep"), float)
             energy = _clean(row.get("energy"), int)
             notes = _clean(row.get("notes"), str)
-            if any(v is not None for v in (mood, sleep, energy, notes)):
-                save_entry(conn, day, mood, sleep, energy, notes)
+            water = _clean(row.get("water"), float) if "water" in df.columns else KEEP
+            if any(v not in (None, KEEP) for v in (mood, sleep, energy, notes, water)):
+                save_entry(conn, day, mood, sleep, energy, notes, water)
 
             for col in habit_cols:
                 set_habit_done(conn, habit_ids[col[len(HABIT_PREFIX):]], day, _is_ticked(row[col]))
@@ -1277,7 +1281,6 @@ def add_goal(title, period, day, target, unit=None, habit_id=None, goal_id=None)
     return get_goal(goal_id)
 
 
-KEEP = object()   # update_goal: leave this field as it is
 
 
 def update_goal(goal_id, title=KEEP, target=KEEP, unit=KEEP, habit_id=KEEP):
@@ -1648,6 +1651,7 @@ def get_stats(days=None, today=None):
         "start": first, "end": last, "days": num_days,
         "days_logged": len(entries),
         "avg_mood": avg("mood"), "avg_sleep": avg("sleep"), "avg_energy": avg("energy"),
+        "avg_water": avg("water"),
         "habit_completion_pct": habits,
         "timetable_hours": hours,
     }

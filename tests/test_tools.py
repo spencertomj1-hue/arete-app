@@ -441,3 +441,16 @@ def test_log_interaction_tools(tools, store, friday):
     assert "Last interaction Fri 30 Oct: Coffee" in tools.find_people().text
     with pytest.raises(tools.ToolError, match="no one called"):
         tools.log_interaction("Zed", "Lunch")
+
+
+def test_log_water(tools, store):
+    tools.log_day(DAY, mood=4)
+    r = tools.log_day(DAY, water=1.5)
+    assert r.changed and store.get_entry(DAY)["water"] == 1.5 and store.get_entry(DAY)["mood"] == 4
+    r = tools.log_day(DAY, water=2)                      # a running total: updates straight away
+    assert not r.pending and "water 1.5 → 2 L" in r.text and store.get_entry(DAY)["water"] == 2
+    tools.log_day(DAY, sleep=7)                          # other fields leave water alone
+    assert store.get_entry(DAY)["water"] == 2
+    assert "water 2 L" in tools.query_entries(DAY, DAY).text
+    with pytest.raises(tools.ToolError):
+        tools.log_day(DAY, water=40)

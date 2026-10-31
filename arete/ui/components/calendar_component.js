@@ -1,7 +1,7 @@
 // Month calendar for the Daily log page. Each day shows small icons for mood,
-// sleep and energy (and a note marker); clicking a day selects it.
+// sleep, energy and water (and a note marker); clicking a day selects it.
 //
-// Python passes { month: "YYYY-MM", today, selected, days: {iso: {mood, sleep, energy, notes}} }.
+// Python passes { month: "YYYY-MM", today, selected, days: {iso: {mood, sleep, energy, water, notes}} }.
 // Triggers back to Python:  select {date, nonce}   nav {dir: -1 | 0 | 1, nonce}
 
 const esc = (s) =>
@@ -13,6 +13,7 @@ const ICON = {
   mood: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.2 2.1 1.8 3.5 1.8s2.5-.6 3.5-1.8M9 9.5h.01M15 9.5h.01"/></svg>',
   sleep: '<svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
   energy: '<svg viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/></svg>',
+  water: '<svg viewBox="0 0 24 24"><path d="M12 3s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11z"/></svg>',
   note: '<svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M9 12h6M9 16h4"/></svg>',
 };
 
@@ -42,7 +43,7 @@ export default function (component) {
     // What a screen reader says for the day, e.g. "Friday 30 October: mood 4, slept 7.5 hours, energy 3, has notes".
     const said = [d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
       [e.mood != null && `mood ${e.mood}`, e.sleep != null && `slept ${+e.sleep} hours`,
-       e.energy != null && `energy ${e.energy}`, e.notes && "has notes"].filter(Boolean).join(", ") || "nothing logged"]
+       e.energy != null && `energy ${e.energy}`, e.water != null && `drank ${+e.water} litres`, e.notes && "has notes"].filter(Boolean).join(", ") || "nothing logged"]
       .join(": ");
     const stat = (kind, value, extra = "") =>
       value == null ? "" : `<span class="stat ${kind}" ${extra}>${ICON[kind]}${esc(value)}</span>`;
@@ -54,6 +55,7 @@ export default function (component) {
           ${stat("mood", e.mood, e.mood ? `style="--c:${MOOD_COLOURS[e.mood]}"` : "")}
           ${stat("sleep", e.sleep == null ? null : `${+e.sleep}h`)}
           ${stat("energy", e.energy)}
+          ${stat("water", e.water == null ? null : `${+e.water}L`)}
         </span>
       </button>`);
   }
@@ -70,6 +72,7 @@ export default function (component) {
         <span class="stat mood" style="--c:#7cb342">${ICON.mood}mood</span>
         <span class="stat sleep">${ICON.sleep}sleep</span>
         <span class="stat energy">${ICON.energy}energy</span>
+        <span class="stat water">${ICON.water}water</span>
       </div>
     </div>
     <div class="cal-grid" role="group" aria-label="${title}">

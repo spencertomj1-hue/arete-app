@@ -67,7 +67,7 @@ def page_daily_log():
             "month": f"{month:%Y-%m}",
             "today": today.isoformat(),
             "selected": selected.isoformat(),
-            "days": {e["date"]: {k: e[k] for k in ("mood", "sleep", "energy", "notes")}
+            "days": {e["date"]: {k: e[k] for k in ("mood", "sleep", "energy", "water", "notes")}
                      for e in entries.to_dict("records")},
         },
         key="log_calendar", on_select_change=_on_select, on_nav_change=_on_month,
@@ -79,10 +79,11 @@ def page_daily_log():
     with st.container(border=True):
         st.subheader(nice_date(selected))
         if entry:
-            a, b, c = st.columns(3)
+            a, b, c, w = st.columns(4)
             a.metric("Mood", f"{entry['mood']}/5" if entry.get("mood") else "–")
             b.metric("Sleep", f"{entry['sleep']:g} h" if entry.get("sleep") is not None else "–")
             c.metric("Energy", f"{entry['energy']}/5" if entry.get("energy") else "–")
+            w.metric("Water", f"{entry['water']:g} L" if entry.get("water") is not None else "–")
             st.markdown(entry["notes"] if entry.get("notes") else "*No notes.*")
         else:
             st.caption("Nothing logged for this day yet.")
@@ -101,10 +102,12 @@ def page_daily_log():
             "Sleep (hours)", 0.0, 24.0, float(entry.get("sleep") or 7.0), step=0.5, key=f"sleep_{d}"
         )
         energy = st.slider("Energy", 1, 5, int(entry.get("energy") or 3), key=f"energy_{d}")
+        water = st.number_input("Water (litres)", 0.0, 15.0, entry.get("water"), step=0.25, format="%.2f",
+                                placeholder="e.g. 2", key=f"water_{d}", help="Leave empty if you didn't track it.")
         notes = st.text_area("Notes", entry.get("notes") or "", key=f"notes_{d}")
         if st.form_submit_button(f"Save {nice_date(selected)}", type="primary"):
             with store.db() as conn:
-                store.save_entry(conn, d, mood, sleep, energy, notes.strip() or None)
+                store.save_entry(conn, d, mood, sleep, energy, notes.strip() or None, water)
             st.toast(f"Saved {nice_date(selected)}.")
             st.rerun()   # refresh the calendar
     if entry:

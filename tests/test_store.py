@@ -88,3 +88,19 @@ def test_stats(store):
     assert s["avg_mood"] == 3 and s["avg_sleep"] == 7 and s["avg_energy"] == 4
     assert s["habit_completion_pct"] == {"Read": round(100 / 7, 1)}
     assert s["timetable_hours"]["actual"] == {"Classes": 2.0}
+
+
+def test_water_import_export(store):
+    import pandas as pd
+    with store.db() as conn:
+        store.save_entry(conn, "2026-10-28", 3, 7.0, 3, None, 2.25)
+        store.save_entry(conn, "2026-10-29", 4, 8.0, 4, "ok", 1.0)
+        store.save_entry(conn, "2026-10-29", 5, 8.0, 4, "ok")            # water not given: kept
+    assert store.get_entry("2026-10-29")["water"] == 1.0
+    df = store.load_all_data()
+    assert dict(zip(df["date"].astype(str), df["water"])) == {"2026-10-29": 1.0, "2026-10-28": 2.25}
+    store.save_all_data(pd.DataFrame({"date": ["2026-10-29"], "mood": [2]}))  # old CSV without water: kept
+    assert store.get_entry("2026-10-29")["water"] == 1.0
+    store.save_all_data(pd.DataFrame({"date": ["2026-10-30"], "water": [3]}))
+    assert store.get_entry("2026-10-30")["water"] == 3.0
+    assert store.get_stats(7, today=__import__("datetime").date(2026, 10, 30))["avg_water"] == 2.08
