@@ -76,3 +76,28 @@ def test_page_and_edit_dialogs(store):
         assert not at.exception
     at.run()                                             # and they don't reopen on the next run
     assert not [t for t in at.text_input if t.key and t.key.startswith("net_")]
+
+
+def test_interaction_log(store):
+    sam = store.add_person("Sam")
+    a = store.add_interaction(sam["id"], "Coffee; talked about her thesis", "2026-10-28")
+    store.add_interaction(sam["id"], "Football", "2026-10-30")
+    assert [i["note"] for i in store.interactions_of(sam["id"])] == ["Football", "Coffee; talked about her thesis"]
+    assert store.last_interactions() == {sam["id"]: "2026-10-30"}
+    store.delete_interaction(a)
+    assert len(store.interactions_of(sam["id"])) == 1
+    with pytest.raises(ValueError):
+        store.add_interaction(sam["id"], "  ", "2026-10-30")
+    store.delete_person(sam["id"])                                   # goes with the person
+    assert store.last_interactions() == {}
+
+
+def test_person_dialog_shows_interactions(store):
+    sam = store.add_person("Sam")
+    store.add_interaction(sam["id"], "Coffee in town", "2026-10-28")
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at.sidebar.radio[0].set_value("Network").run()
+    at.session_state["net_edit"] = {"kind": "person", "id": sam["id"]}
+    at.run()
+    assert not at.exception
+    assert any("Coffee in town" in m.value for m in at.markdown)

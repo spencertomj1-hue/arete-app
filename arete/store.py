@@ -217,6 +217,15 @@ def init_db():
                 PRIMARY KEY (a, b),
                 CHECK (a < b)
             );
+            -- Times the user saw or spoke to someone ("had coffee, talked about X")
+            CREATE TABLE IF NOT EXISTS net_interactions (
+                id         TEXT PRIMARY KEY,
+                person_id  TEXT NOT NULL REFERENCES net_people(id) ON DELETE CASCADE,
+                date       TEXT NOT NULL,                -- YYYY-MM-DD
+                note       TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS net_interactions_person ON net_interactions (person_id, date);
             """
         )
         # Columns added after the first release.
@@ -1494,6 +1503,38 @@ def net_links():
     with db() as conn:
         rows = conn.execute("SELECT a, b, reason FROM net_links").fetchall()
     return [{"a": a, "b": b, "reason": r} for a, b, r in rows]
+
+
+def add_interaction(person_id, note, day):
+    """Log a time the user saw or spoke to someone; returns its id."""
+    note = str(note).strip()
+    if not note:
+        raise ValueError("Say what happened.")
+    iid = uuid.uuid4().hex
+    with db() as conn:
+        conn.execute("INSERT INTO net_interactions VALUES (?, ?, ?, ?, ?)",
+                     (iid, person_id, _as_date(day).isoformat(), note, datetime.now(TZ).isoformat(timespec="seconds")))
+    return iid
+
+
+def interactions_of(person_id, limit=None):
+    """[{id, date, note}] for one person, newest first."""
+    with db() as conn:
+        rows = conn.execute("SELECT id, date, note FROM net_interactions WHERE person_id = ? "
+                            "ORDER BY date DESC, created_at DESC" + (f" LIMIT {int(limit)}" if limit else ""),
+                            (person_id,)).fetchall()
+    return [{"id": i, "date": d, "note": n} for i, d, n in rows]
+
+
+def last_interactions():
+    """{person_id: date of the latest interaction}."""
+    with db() as conn:
+        return dict(conn.execute("SELECT person_id, MAX(date) FROM net_interactions GROUP BY person_id").fetchall())
+
+
+def delete_interaction(interaction_id):
+    with db() as conn:
+        conn.execute("DELETE FROM net_interactions WHERE id = ?", (interaction_id,))
 
 
 def connections_of(person_id):

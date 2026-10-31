@@ -953,7 +953,30 @@ def find_people(query=None):
         links = store.connections_of(p["id"])
         if links:
             line += ". Knows " + "; ".join(o["name"] + (f" ({r})" if r else "") for o, r in links)
+        last = store.interactions_of(p["id"], limit=1)
+        if last:
+            line += f". Last interaction {nice_day(last[0]['date'])}: {last[0]['note']}"
         lines.append(line)
     if len(lines) == 1:
         lines.append("No one matches." if query else "The network is empty.")
     return Result("\n".join(lines))
+
+
+def log_interaction(person, note, date=None):
+    """Note a time the user saw or spoke to someone, e.g. "Coffee; talked about her thesis"."""
+    p = _find_person(person)
+    day = _day(date) if date else store.london_today().isoformat()
+    try:
+        store.add_interaction(p["id"], note, day)
+    except ValueError as e:
+        raise ToolError(str(e))
+    return Result(f"Logged for {p['name']} on {nice_day(day)}: {str(note).strip()}", changed=True)
+
+
+def person_history(person, limit=20):
+    """The times the user logged seeing or speaking to someone, newest first."""
+    p = _find_person(person)
+    rows = store.interactions_of(p["id"], limit=int(limit))
+    if not rows:
+        return Result(f"Nothing logged with {p['name']} yet.")
+    return Result(f"{p['name']}:\n" + "\n".join(f"- {nice_day(r['date'])} ({r['date']}): {r['note']}" for r in rows))

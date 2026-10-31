@@ -242,6 +242,10 @@ What the app tracks
     Everyone is already linked to the user in the web, so never connect someone to the user.
   - Use find_people to look someone up or check who exists before adding (avoid duplicates).
   - disconnect_people and delete_person need the user's confirmation.
+  - Times the user sees or speaks to someone go in their interaction log: "had coffee with Priya,
+    talked about her thesis" -> log_interaction(person="Priya", note="Coffee; talked about her thesis")
+    (date defaults to today; "yesterday" etc. -> pass the date). person_history lists them. If the
+    person isn't in the network yet, ask whether to add them first.
 
 {tools.list_categories().text}
 
@@ -388,6 +392,13 @@ TOOL_SPECS = [
      tools.edit_group),
     ("delete_group", "Delete a network group; its people and sub-groups move up a level.",
      _schema(["group"], group={"type": "string"}), tools.delete_group),
+    ("log_interaction", "Note a time the user saw or spoke to someone in their network (date defaults to today).",
+     _schema(["person", "note"], person={"type": "string"},
+             note={"type": "string", "description": "what happened, e.g. 'Coffee; talked about her thesis'"},
+             date=DATE),
+     tools.log_interaction),
+    ("person_history", "List the interactions logged with someone, newest first.",
+     _schema(["person"], person={"type": "string"}), tools.person_history),
     ("find_people", "List people in the network (with ids, groups and connections), optionally filtered by a search.",
      _schema([], query={"type": "string"}), tools.find_people),
     ("set_activity_default", "Set which category an activity label (e.g. 'Lecture') uses by default.",

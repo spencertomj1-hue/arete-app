@@ -113,6 +113,25 @@ def _person_dialog(person_id):
             store.link_people(person_id, other, reason)
             st.rerun(scope="fragment")
 
+    st.markdown("**Times you've met or spoken**")
+    with st.form(f"net_meet_{person_id}", clear_on_submit=True, border=False):
+        a, b, c = st.columns([2, 5, 2], vertical_alignment="bottom")
+        when = a.date_input("When", value=store.london_today(), format="DD/MM/YYYY")
+        note = b.text_input("What happened", placeholder="e.g. Coffee; talked about her thesis")
+        if c.form_submit_button("Add", icon=":material/add:") and note.strip():
+            store.add_interaction(person_id, note, when)
+            st.rerun(scope="fragment")
+    history = store.interactions_of(person_id)
+    if not history:
+        st.caption("Nothing logged yet. You can also tell Arete, e.g. \"had coffee with them today\".")
+    for item in history:
+        left, right = st.columns([6, 1], vertical_alignment="center")
+        d = store._as_date(item["date"])
+        left.markdown(f"**{d:%a} {d.day} {d:%b %Y}** · {item['note']}")     # (no %-d: Windows lacks it)
+        if right.button("", icon=":material/delete:", key=f"net_meet_del_{item['id']}", help="Remove this"):
+            store.delete_interaction(item["id"])
+            st.rerun(scope="fragment")
+
     st.divider()
     if st.toggle(f"Remove {p['name']} from the network", key=f"net_del_{person_id}"):
         if st.button("Remove", type="primary", icon=":material/delete:", key=f"net_del_go_{person_id}"):
@@ -184,7 +203,9 @@ def render_page():
 
     data = {
         "people": [{"id": p["id"], "name": p["name"], "description": p["description"],
-                    "worksFor": p["works_for"], "groupId": p["group_id"]} for p in store.net_people()],
+                    "worksFor": p["works_for"], "groupId": p["group_id"],
+                    "recent": store.interactions_of(p["id"], limit=3)} for p in store.net_people()],
+        "today": store.london_today().isoformat(),
         "links": store.net_links(),
         "groups": store.net_groups(),
     }

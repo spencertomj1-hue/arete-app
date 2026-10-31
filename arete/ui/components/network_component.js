@@ -384,10 +384,24 @@ class Web {
       ${this.chip(p.groupId)}
       ${p.worksFor ? `<div class="nw-row"><span>Works for</span>${esc(p.worksFor)}</div>` : ""}
       ${p.description ? `<p class="nw-desc">${esc(p.description)}</p>` : ""}
+      ${this.metHtml(p)}
       <div class="nw-sub">Connections (${links.length})</div>
       ${links.length ? `<ul class="nw-links">${links.map((l) => this.personItem(l.id, l.reason ? `<span>${esc(l.reason)}</span>` : "")).join("")}</ul>`
         : `<div class="nw-none">No connections yet.</div>`}
       <div class="nw-actions"><button class="primary" data-edit="person">Edit</button></div>`;
+  }
+
+  // "Last spoke: 3 days ago" and the latest few things logged with this person.
+  metHtml(p) {
+    const recent = p.recent || [];
+    if (!recent.length) return "";
+    const days = Math.round((new Date(this.data.today + "T00:00") - new Date(recent[0].date + "T00:00")) / 864e5);
+    const ago = days <= 0 ? "today" : days === 1 ? "yesterday" : days < 14 ? `${days} days ago`
+      : days < 60 ? `${Math.round(days / 7)} weeks ago` : `${Math.round(days / 30)} months ago`;
+    const when = (iso) => new Date(iso + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    return `<div class="nw-row"><span>Last spoke</span>${ago}</div>
+      <div class="nw-sub">Recently</div>
+      <ul class="nw-met">${recent.map((r) => `<li><b>${esc(when(r.date))}</b> ${esc(r.note)}</li>`).join("")}</ul>`;
   }
 
   renderGroupCard(gid) {
