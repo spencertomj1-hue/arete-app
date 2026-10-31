@@ -42,7 +42,7 @@ It runs entirely on your computer (Mac or Windows) as a normal app. It's built w
 
 ## Features
 
-**Home.** Today's agenda and timetable on the left. On the right: the box to ask Claude, your to-dos, today's habits to tick (with the last 7 days and your streak), and your goals' progress bars.
+**Home.** Today's agenda and timetable on the left. On the right: the box to ask Claude (if it's on), your to-dos, deadlines, today's habits to tick (with the last 7 days and your streak), your goals' progress bars, and a **search box** that finds anything (to-dos, goals, deadlines, habits, your journal, timetable blocks, Outlook events, people, groups, times you met and past reviews), with Open to jump straight there.
 
 **To-dos (on Home).** Today's, this week's and this month's to-do lists, side by side, in the style of Apple Reminders.
 - **Ticking off:** click the circle; the to-do moves into a folded "Completed" section. Click it again to untick.

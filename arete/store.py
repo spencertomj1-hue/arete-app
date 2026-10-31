@@ -1971,4 +1971,46 @@ def get_stats(days=None, today=None):
     }
 
 
+# ---------------------------------------------------------------------------
+# Search: one box for everything (Home)
+# ---------------------------------------------------------------------------
+
+# kind -> SQL giving (id, title, detail, date, extra) for rows whose `haystack` contains every word.
+_SEARCH = {
+    "To-do": ("SELECT id, title, notes, period_start, period FROM todos", "title || ' ' || COALESCE(notes, '')"),
+    "Goal": ("SELECT id, title, unit, period_start, period FROM goals", "title"),
+    "Deadline": ("SELECT id, title, notes, due, done FROM deadlines", "title || ' ' || COALESCE(notes, '')"),
+    "Habit": ("SELECT id, name, NULL, NULL, per_week FROM habits", "name"),
+    "Journal": ("SELECT date, notes, NULL, date, NULL FROM entries", "COALESCE(notes, '')"),
+    "Timetable": ("SELECT id, label, details, date, track || ' ' || start || '-' || \"end\" FROM tt_entries",
+                  "label || ' ' || COALESCE(details, '')"),
+    "Outlook": ("SELECT uid, title, location, date, start FROM tt_outlook",
+                "title || ' ' || COALESCE(location, '') || ' ' || COALESCE(description, '')"),
+    "Person": ("SELECT id, name, description, NULL, works_for FROM net_people",
+               "name || ' ' || COALESCE(description, '') || ' ' || COALESCE(works_for, '')"),
+    "Group": ("SELECT id, name, NULL, NULL, NULL FROM net_groups", "name"),
+    "Met": ("SELECT i.person_id, p.name, i.note, i.date, NULL FROM net_interactions i "
+            "JOIN net_people p ON p.id = i.person_id", "i.note || ' ' || p.name"),
+    "Review": ("SELECT week_start, 'Weekly review', COALESCE(went_well, '') || ' ' || COALESCE(to_change, ''), "
+               "week_start, NULL FROM weekly_reviews", "COALESCE(went_well, '') || ' ' || COALESCE(to_change, '')"),
+}
+
+
+def search(query, per_kind=8):
+    """Everything matching all the words in `query` (any case), as
+    [{kind, id, title, detail, date, extra}], newest first within each kind."""
+    words = str(query or "").split()
+    if not words:
+        return []
+    out = []
+    with db() as conn:
+        for kind, (select, haystack) in _SEARCH.items():
+            where = " AND ".join(f"{haystack} LIKE ? ESCAPE '\\'" for _ in words)
+            params = ["%" + w.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%" for w in words]
+            order = " ORDER BY 4 DESC" if kind not in ("Habit", "Group", "Person") else " ORDER BY 2"
+            rows = conn.execute(f"{select} WHERE {where}{order} LIMIT {int(per_kind)}", params).fetchall()
+            out += [{"kind": kind, "id": r[0], "title": r[1], "detail": r[2], "date": r[3], "extra": r[4]} for r in rows]
+    return out
+
+
 _apply_day_hours()      # SLOTS / FIRST_MIN from settings.json (re-run when they change)

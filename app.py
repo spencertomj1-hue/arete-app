@@ -17,6 +17,7 @@ from arete.ui import chat
 from arete.ui import daily_log
 from arete.ui import goals
 from arete.ui import deadlines
+from arete.ui import search
 from arete.ui import review as review_ui
 from arete.ui import todos
 from arete.ui import network
@@ -94,6 +95,7 @@ def page_home():
         deadlines.render_home()
         daily_log.render_home_habits()
         goals.render_home()
+        search.render_home()                     # search everything (bottom right)
 
 
 DAY_MS = 24 * 60 * 60 * 1000   # Plotly measures date steps in milliseconds

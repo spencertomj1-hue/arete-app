@@ -50,6 +50,7 @@ arete/                         The app's code, as a package (imported as `from a
   undo.py                      Undo: whole-database snapshot before deletes / overwrites (ui/undo_bar.py offers it)
   setup_checks.py              Logic behind the wizard/Settings: Claude status, mic test, backups, Finder
   ui/                          One module per page or section (imported as `from arete.ui import goals`, ...)
+    search.py                  Home's search box: store.search (every word, any case, per kind) and Open (sets page + day / person)
     timetable.py               Timetable page and the week/day grid's Python side
     timetable_tools.py         Buttons above the grid: Add block, Fit time, Categories (dialogs calling the same tools.py functions as Claude)
     daily_log.py               Daily Log page (month calendar, day card, the day's habits, entry form with the journal box, past entries) and Home's habits
