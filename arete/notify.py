@@ -59,13 +59,29 @@ def due(now, minutes, sent):
     return out
 
 
+DEADLINE_HOUR = 9        # deadlines due today or tomorrow are announced once, from 9 am
+
+
+def due_deadlines(now, sent):
+    """[(key, title, body)] for deadlines due today or tomorrow, once each per day, after 9 am."""
+    if now.hour < DEADLINE_HOUR:
+        return []
+    out = []
+    for d in store.deadlines():
+        days = (store._as_date(d["due"]) - now.date()).days
+        key = f"{now.date().isoformat()}|deadline|{d['id']}"
+        if 0 <= days <= 1 and key not in sent:
+            out.append((key, f"Due {'today' if days == 0 else 'tomorrow'}: {d['title']}", d["notes"] or ""))
+    return out
+
+
 def check(sent, now=None):
     """Announce whatever is due; returns what was sent."""
     on, minutes = settings()
     if not on:
         return []
     now = now or datetime.now(store.TZ).replace(tzinfo=None)
-    out = due(now, minutes, sent)
+    out = due(now, minutes, sent) + due_deadlines(now, sent)
     for key, title, body in out:
         sent.add(key)
         system.notify(title, body)

@@ -209,6 +209,10 @@ What the app tracks
     into their own block and changes it, delete_block removes it from Arete's timetable (both need the
     user's confirmation), and adding a block over one trims it. None of this ever changes Outlook.
 
+- Deadlines: things due on a date ("essay due Friday", "apply for the internship by 15 Nov") ->
+  add_deadline(title, due). They show on Home with a countdown. complete_deadline ticks one off;
+  edit_deadline changes it; delete_deadline needs confirmation. To make time for one, use plan_time
+  with end_date the day before it's due.
 - To-dos: tick-off lists for a day, a week (Monday to Sunday) or a month (period "daily", "weekly" or
   "monthly"), shown on the Home page. A to-do belongs to the period containing its date (default today).
   Users often call these "goals" ("add go gym to this week's goals", "today's goals"): anything for a
@@ -352,6 +356,17 @@ TOOL_SPECS = [
      tools.edit_category),
     ("set_outlook_category", "Set which category (and so colour) Outlook calendar events use.",
      _schema(["category"], category={"type": "string"}), tools.set_outlook_category),
+    ("add_deadline", "Add a deadline: something due on a date.",
+     _schema(["title", "due"], title={"type": "string"}, due=DATE, notes={"type": "string"}), tools.add_deadline),
+    ("list_deadlines", "List deadlines, soonest first (with ids and countdowns).",
+     _schema([], include_done={"type": "boolean"}), tools.list_deadlines),
+    ("complete_deadline", "Tick a deadline off (done=false reopens it). Find it by id or title.",
+     _schema(["deadline"], deadline={"type": "string"}, done={"type": "boolean"}), tools.complete_deadline),
+    ("edit_deadline", "Change a deadline's title, due date or notes.",
+     _schema(["deadline"], deadline={"type": "string"}, title={"type": "string"}, due=DATE, notes={"type": "string"}),
+     tools.edit_deadline),
+    ("delete_deadline", "Delete a deadline (needs the user's confirmation).",
+     _schema(["deadline"], deadline={"type": "string"}), tools.delete_deadline),
     ("add_todo", "Add a to-do to a day, week or month: the period containing `date` (default today).",
      _schema(["title", "period"], title={"type": "string"}, period=TODO_PERIOD,
              date={**DATE, "description": "YYYY-MM-DD, any day in the period (default today)"},

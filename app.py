@@ -16,6 +16,7 @@ import streamlit as st
 from arete.ui import chat
 from arete.ui import daily_log
 from arete.ui import goals
+from arete.ui import deadlines
 from arete.ui import todos
 from arete.ui import network
 from arete.ui import settings_ui
@@ -41,6 +42,7 @@ def _agenda():
             else:
                 blocks.append({"start": ev["start"], "end": ev["end"], "label": ev["title"], "outlook": True,
                                "category_id": store.outlook_category(ev["title"]), "exact": ev["exact"]})
+    all_day += [f"Due: {d['title']}" for d in store.deadlines() if d["due"] == today]
     blocks.sort(key=lambda b: store.slot_of(b["start"]))
     colours = dict(zip(*[store.load_categories()[c] for c in ("id", "colour")]))
     now = datetime.now()
@@ -87,6 +89,7 @@ def page_home():
         if store.ai_enabled():
             chat.render(inline=True)
         todos.render_home()
+        deadlines.render_home()
         daily_log.render_home_habits()
         goals.render_home()
 

@@ -52,6 +52,8 @@ It runs entirely on your computer (Mac or Windows) as a normal app. It's built w
 - **Progress:** either update it yourself (− / + or type a number), or link the goal to a habit and every day you tick that habit counts.
 - **Moving around:** ‹ › shows other months and years.
 
+**Deadlines.** Things due on a date (an essay, an application), on the Goals page and on Home with a countdown ("in 3 days", red when overdue). They show on the timetable's day header and in Home's agenda, you get a reminder the day before and on the day, and **Make time** fits hours for one into your Plan before it's due.
+
 **Weekly timetable.**
 - **Layout:** a calendar-style week. Each day has a **Plan** column (what you intended) and an **Actual** column (what really happened), in 30-minute slots from 07:00 to 01:00. Anything after midnight counts as the previous day.
 - **Editing:** drag down a column to add a block, or click a block to see its details, edit it or delete it. **Add block** does the same with a form (and the keyboard).

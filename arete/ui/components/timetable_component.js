@@ -395,7 +395,7 @@ class Timetable {
     this.root.querySelectorAll("th.day .chips").forEach((box) => {
       const date = this.data.days[+box.dataset.d];
       box.innerHTML = (this.data.outlookAllDay || []).filter((c) => c.date === date)
-        .map((c) => `<span class="chip" title="${esc(c.title)} (Outlook, all day)">${esc(c.title)}</span>`).join("");
+        .map((c) => `<span class="chip${c.deadline ? " due" : ""}" title="${esc(c.title)} (${c.deadline ? "deadline" : "Outlook, all day"})">${esc(c.title)}</span>`).join("");
     });
     this.layoutBlocks();
     this.renderBlockList();

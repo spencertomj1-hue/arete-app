@@ -11,6 +11,8 @@ edit_category, ...), so the rules and the Confirm previews are identical.
 
 from datetime import timedelta
 
+import re
+
 import streamlit as st
 
 from arete import store
@@ -28,12 +30,29 @@ def _category_names():
     return list(store.load_categories()["name"])
 
 
+def _for_people(message):
+    """Tool errors are worded for Claude ("Ask the user ..."); drop those bits for a person."""
+    message = re.sub(r"\s*(Ask the user|Use list_\w+|Set create=true)[^.]*(: [^.]*)?\.", "", message)
+    return message.replace("There's no default category for", "Pick a category: there's no default for")
+
+
+def _category_choice(label, category):
+    """None for Automatic, else the picked name; shows an error (and returns False) if Automatic can't work."""
+    if category != AUTO:
+        return category
+    if label.strip() and store.resolve_category(label=label.strip()) is None:
+        st.error(f"Pick a category for “{label.strip()}” (it has no default yet; you can set one in Categories).",
+                 icon=":material/error:")
+        return False
+    return None
+
+
 def _call(fn, *args, **kwargs):
     """Run a tool: a preview waits for Confirm; otherwise say what happened and refresh the page."""
     try:
         r = fn(*args, **kwargs)
     except tools.ToolError as e:
-        st.error(str(e), icon=":material/error:")
+        st.error(_for_people(str(e)), icon=":material/error:")
         return
     if r.pending:
         st.session_state[PENDING] = r.pending
@@ -81,8 +100,10 @@ def _add_block_dialog(day):
         category = st.selectbox("Category", [AUTO] + _category_names())
         details = st.text_area("Details (optional)", height=80)
         if st.form_submit_button("Add", type="primary", icon=":material/add:"):
-            _call(tools.add_block, when.isoformat(), (track or "Plan").lower(), start, end, label,
-                  category=None if category == AUTO else category, details=details.strip() or None)
+            cat = _category_choice(label, category)
+            if cat is not False:
+                _call(tools.add_block, when.isoformat(), (track or "Plan").lower(), start, end, label,
+                      category=cat, details=details.strip() or None)
     st.caption("If it overlaps blocks already there, you'll see what changes before anything is overwritten.")
 
 
@@ -91,20 +112,23 @@ def _add_block_dialog(day):
 # ---------------------------------------------------------------------------
 
 @st.dialog("Fit time into your Plan", width="large")
-def _fit_dialog(day):
+def _fit_dialog(day, label="", last=None, category=None):
     st.caption("Finds free gaps in your Plan (around your blocks and Outlook events) and spreads the "
                "hours over the days, with a break between sittings. You'll see the times before anything is added.")
     if _confirm_box("Add to Plan"):
         return
     today = store.london_today()
     first = max(day, today)
+    last = max(first, last) if last else first + timedelta(days=6)
     with st.form("tt_fit_form", border=False):
         a, b = st.columns([2, 1])
-        label = a.text_input("What", placeholder="e.g. Revision")
+        label = a.text_input("What", value=label, placeholder="e.g. Revision")
         hours = b.number_input("Hours in total", 0.5, 60.0, 6.0, step=0.5)
-        category = st.selectbox("Category", [AUTO] + _category_names(), key="tt_fit_cat")
+        options = [AUTO] + _category_names()
+        category = st.selectbox("Category", options, key="tt_fit_cat",
+                                index=options.index(category) if category in options else 0)
         a, b = st.columns(2)
-        span = a.date_input("Between", value=(first, first + timedelta(days=6)), format="DD/MM/YYYY",
+        span = a.date_input("Between", value=(first, last), format="DD/MM/YYYY",
                             help="Pick the first and last day.")
         longest = b.number_input("Longest sitting (hours)", 0.5, 8.0, 2.0, step=0.5)
         a, b, c = st.columns([1, 1, 1], vertical_alignment="bottom")
@@ -116,9 +140,9 @@ def _fit_dialog(day):
                 st.error("Say what it's for, e.g. Revision.")
             elif len(span) != 2:
                 st.error("Pick both the first and the last day.")
-            else:
+            elif (cat := _category_choice(label, category)) is not False:
                 _call(tools.plan_time, label, hours, span[0].isoformat(), span[1].isoformat(),
-                      category=None if category == AUTO else category, earliest=earliest, latest=latest,
+                      category=cat, earliest=earliest, latest=latest,
                       max_block_hours=longest, weekdays_only=weekdays)
 
 
@@ -198,6 +222,13 @@ def _categories_dialog():
 # ---------------------------------------------------------------------------
 # The toolbar
 # ---------------------------------------------------------------------------
+
+def open_fit(label, last):
+    """Fit time for something specific (e.g. a deadline), finishing by `last`."""
+    st.session_state.pop(PENDING, None)
+    names = _category_names()
+    _fit_dialog(store.london_today(), label, last, "Study" if "Study" in names else None)
+
 
 def toolbar(day):
     a, b, c, _ = st.columns([1, 1, 1, 4])

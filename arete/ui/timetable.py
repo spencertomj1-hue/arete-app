@@ -180,7 +180,9 @@ def render_grid(days, key="timetable", single=False, readonly=False):
              "details": store.outlook_details(e), "categoryId": store.outlook_category(e["title"])}
             for e in events if not e["all_day"]
         ],
-        "outlookAllDay": [{"date": e["date"], "title": e["title"]} for e in events if e["all_day"]],
+        "outlookAllDay": [{"date": e["date"], "title": e["title"]} for e in events if e["all_day"]]
+        + [{"date": d["due"], "title": f"Due: {d['title']}", "deadline": True} for d in store.deadlines()
+           if days[0].isoformat() <= d["due"] <= days[-1].isoformat()],
         "sync": _sync_text(),
     }
     _timetable_component(data=data, key=key,
