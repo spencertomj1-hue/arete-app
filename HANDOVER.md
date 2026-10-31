@@ -210,6 +210,7 @@ Two different things:
 
 ## 9. Gotchas
 
+- **Timetable hours:** `store.SLOTS` / `FIRST_MIN` come from settings.json `day_start` / `day_end` (`_apply_day_hours`, re-run by `save_settings`); never hard-code 36 or 07:00, and don't use them as default arguments (they'd be frozen at import). Blocks outside the hours stay in the database, hidden.
 - **Week start:** weekly to-dos are stored under the week's first day, so `store.set_week_start` moves them (±1 day) when it changes. Use `store.week_start_of(day)`, never `day.weekday()`, for week maths.
 - **Time zone:** never use `date.today()` / `datetime.now()` for the user's day: use `store.local_today()` / `store.local_now()` / `store.stamp()`. The zone is settings.json "timezone" (Settings → Region) or the computer's (`tzlocal`). The tests pin Europe/London in conftest.
 - **Keyboard:** every page is checked by tabbing through it: each stop must show focus (Streamlit's controls draw their own; `appearance.apply_text_colours()` adds rings for the scrollable main area, links and `[tabindex]`; components have their own `:focus-visible`). Streamlit's "Skip to main content" link is the first stop. Headings use `anchor=False` (otherwise each adds an invisible "link to heading" stop). Dialogs close with Esc; the sidebar menu is one radio group (arrow keys).

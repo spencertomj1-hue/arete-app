@@ -360,6 +360,25 @@ def region_section():
     st.caption(f"Example: {regional.long_date(sample)} · {regional.numeric_date(sample)} · "
                f"{regional.time_range('09:00', '17:30')} · {regional.water_text(2.0)}")
 
+    st.subheader("Timetable hours")
+    start, end = store.day_hours()
+    hours = list(range(24))
+    a, b = st.columns(2)
+    new_start = a.selectbox("Day starts at", hours, index=start, format_func=lambda h: regional.time(f"{h:02d}:00"),
+                            key="region_day_start")
+    new_end = b.selectbox("Day ends at", hours, index=end, key="region_day_end",
+                          format_func=lambda h: regional.time(f"{h:02d}:00")
+                          + (" (next day)" if h <= new_start else ""))
+    length = store.day_length(new_start, new_end)
+    if (new_start, new_end) != (start, end):
+        if length < store.MIN_DAY_HOURS:
+            st.error(f"Make the day at least {store.MIN_DAY_HOURS} hours long.")
+        else:
+            store.save_settings(day_start=new_start, day_end=new_end)
+            st.rerun()
+    st.caption(f"{length} hours a day. Anything after midnight counts as the day before, like a late night. "
+               "Blocks outside these hours stay saved; widen the hours again to see them.")
+
 
 def page_settings():
     st.header("Settings", anchor=False)

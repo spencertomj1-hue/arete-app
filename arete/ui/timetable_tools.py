@@ -27,6 +27,11 @@ def _times(first, last):
     return [store.slot_time(i) for i in range(first, last + 1)]
 
 
+def _at(options, wanted, fallback=0):
+    """Index of a default time in a list of times (or the fallback if the day doesn't include it)."""
+    return options.index(wanted) if wanted in options else min(fallback, len(options) - 1)
+
+
 def _category_names():
     return list(store.load_categories()["name"])
 
@@ -95,8 +100,9 @@ def _add_block_dialog(day):
         track = b.segmented_control("Column", ["Plan", "Actual"], default="Plan",
                                     help="Plan: what you intend to do. Actual: what you really did.")
         a, b = st.columns(2)
-        start = a.selectbox("From", _times(0, store.SLOTS - 1), index=4, format_func=regional.time)
-        end = b.selectbox("To", _times(1, store.SLOTS), index=5, format_func=regional.time, help="Times after midnight count as the same day.")
+        starts, ends = _times(0, store.SLOTS - 1), _times(1, store.SLOTS)
+        start = a.selectbox("From", starts, index=_at(starts, "09:00"), format_func=regional.time)
+        end = b.selectbox("To", ends, index=_at(ends, "10:00", 1), format_func=regional.time, help="Times after midnight count as the same day.")
         label = st.text_input("What", placeholder="e.g. Lecture, Gym, Revision")
         category = st.selectbox("Category", [AUTO] + _category_names())
         details = st.text_area("Details (optional)", height=80)
@@ -133,8 +139,9 @@ def _fit_dialog(day, label="", last=None, category=None):
                             help="Pick the first and last day.")
         longest = b.number_input("Longest sitting (hours)", 0.5, 8.0, 2.0, step=0.5)
         a, b, c = st.columns([1, 1, 1], vertical_alignment="bottom")
-        earliest = a.selectbox("Not before", _times(0, store.SLOTS - 1), index=4, format_func=regional.time)
-        latest = b.selectbox("Not after", _times(1, store.SLOTS), index=28, format_func=regional.time)
+        starts, ends = _times(0, store.SLOTS - 1), _times(1, store.SLOTS)
+        earliest = a.selectbox("Not before", starts, index=_at(starts, "09:00"), format_func=regional.time)
+        latest = b.selectbox("Not after", ends, index=_at(ends, "21:00", len(ends) - 1), format_func=regional.time)
         weekdays = c.checkbox("Weekdays only")
         if st.form_submit_button("Find times", type="primary", icon=":material/event_available:"):
             if not label.strip():

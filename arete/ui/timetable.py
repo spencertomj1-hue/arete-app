@@ -186,6 +186,8 @@ def render_grid(days, key="timetable", single=False, readonly=False):
            if days[0].isoformat() <= d["due"] <= days[-1].isoformat()],
         "sync": _sync_text(),
         "clock": regional.clock(),
+        "slots": store.SLOTS,
+        "firstMin": store.FIRST_MIN,
         "dateFormat": regional.date_format(),
     }
     _timetable_component(data=data, key=key,

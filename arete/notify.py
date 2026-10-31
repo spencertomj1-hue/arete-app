@@ -28,7 +28,7 @@ def settings():
 
 
 def starts_at(day, hhmm):
-    """When a block on a timetable day really starts (times before 07:00 are after midnight)."""
+    """When a block on a timetable day really starts (times before the day's start are after midnight)."""
     t = datetime.combine(store._as_date(day), datetime.strptime(hhmm, "%H:%M").time())
     return t + timedelta(days=1) if t.hour * 60 + t.minute < store.FIRST_MIN else t
 

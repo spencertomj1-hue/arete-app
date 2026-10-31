@@ -55,7 +55,7 @@ It runs entirely on your computer (Mac or Windows) as a normal app. It's built w
 **Deadlines.** Things due on a date (an essay, an application), on the Goals page and on Home with a countdown ("in 3 days", red when overdue). They show on the timetable's day header and in Home's agenda, you get a reminder the day before and on the day, and **Make time** fits hours for one into your Plan before it's due.
 
 **Weekly timetable.**
-- **Layout:** a calendar-style week. Each day has a **Plan** column (what you intended) and an **Actual** column (what really happened), in 30-minute slots from 07:00 to 01:00. Anything after midnight counts as the previous day.
+- **Layout:** a calendar-style week. Each day has a **Plan** column (what you intended) and an **Actual** column (what really happened), in 30-minute slots from 07:00 to 01:00 (change the hours in Settings → Region). Anything after midnight counts as the previous day.
 - **Editing:** drag down a column to add a block, or click a block to see its details, edit it or delete it. **Add block** does the same with a form (and the keyboard).
 - **Categories:** colour-coded, with groups "Life" and "Work" to start with. Activities pick their category automatically (for example "Lunch" → Meals). **Categories** (above the grid) adds, renames and recolours them, sets those activity defaults, and picks Outlook events' colour.
 - **Fit time:** say what (e.g. Revision), how many hours and which days; Arete finds free gaps around your blocks and Outlook events, spreads the sittings out and shows you the times before adding them.
@@ -96,6 +96,7 @@ Claude only changes Arete's data, through a fixed set of actions. **Anything tha
 
 **Settings.**
 - Region: time zone (your computer's, or pick one), week starting Monday or Sunday, 12- or 24-hour clock, date format, and water in litres or US fl oz
+- Timetable hours: when your day starts and ends (07:00 to 01:00 to start with; night owls and shift workers can move it)
 - Appearance: light, dark, or follow your computer, and text size (Small, Normal, Large, Extra large)
 - Calendar connection
 - Claude sign-in status

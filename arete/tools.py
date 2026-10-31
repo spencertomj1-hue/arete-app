@@ -54,7 +54,7 @@ def nice_day(iso):
 
 
 def _slot(value, is_end):
-    """'HH:mm' on the half hour, within 07:00-01:00 -> slot index."""
+    """'HH:mm' on the half hour, within the timetable's hours -> slot index."""
     m = re.fullmatch(r"(\d{1,2}):(\d{2})", str(value).strip())
     if not m or int(m.group(1)) > 23 or m.group(2) not in ("00", "30"):
         raise ToolError(f"'{value}' isn't a valid time. Use HH:mm on the hour or half hour, e.g. 09:30.")
@@ -62,7 +62,8 @@ def _slot(value, is_end):
     s = store.slot_of(t)
     lo, hi = (1, store.SLOTS) if is_end else (0, store.SLOTS - 1)
     if not lo <= s <= hi:
-        raise ToolError(f"{t} is outside the timetable, which runs from 07:00 to 01:00 (next day).")
+        raise ToolError(f"{t} is outside the timetable, which runs from {store.slot_time(0)} to "
+                        f"{store.slot_time(store.SLOTS)}" + (" (next day)." if store.slot_time(store.SLOTS) <= store.slot_time(0) else "."))
     return s
 
 
@@ -357,7 +358,8 @@ def add_block(date, track, start, end, label, category=None, details=None, confi
     day, track = _day(date), _track(track)
     s, e = _slot(start, False), _slot(end, True)
     if e <= s:
-        raise ToolError("end must be after start (the day runs 07:00 → 01:00, so 00:30 is after 23:00).")
+        raise ToolError(f"end must be after start (the day runs {store.slot_time(0)} → {store.slot_time(store.SLOTS)}; "
+                        "times after midnight count as the same day).")
     label = str(label).strip()
     if not label:
         raise ToolError("The block needs a label.")
@@ -469,9 +471,18 @@ def _now():
     return store.local_now()
 
 
+def _in_day(t, is_end=False):
+    try:
+        _slot(t, is_end)
+        return True
+    except ToolError:
+        return False
+
+
 def _first_future_slot(day):
     """The first slot on a timetable day that hasn't started yet (SLOTS if the day is over)."""
-    gone = (_now() - datetime.combine(date.fromisoformat(day), time(7))).total_seconds() / 60
+    start = datetime.combine(date.fromisoformat(day), time(store.FIRST_MIN // 60, store.FIRST_MIN % 60))
+    gone = (_now() - start).total_seconds() / 60
     return min(store.SLOTS, max(0, -(-int(gone) // 30)))
 
 
@@ -492,7 +503,9 @@ def plan_time(label, hours, start_date, end_date, category=None, earliest="09:00
     if need < 1:
         raise ToolError("hours must be at least 0.5.")
     first_day, last_day = _date_range(start_date, end_date, max_days=31)
-    lo, hi = _slot(earliest, False), _slot(latest, True)
+    # The default 09:00-21:00 window is cut to the timetable's hours if they're shorter.
+    lo = _slot(earliest, False) if earliest != "09:00" or _in_day("09:00") else 0
+    hi = _slot(latest, True) if latest != "21:00" or _in_day("21:00", True) else store.SLOTS
     if hi <= lo:
         raise ToolError("latest must be after earliest.")
     chunk = max(1, round(float(max_block_hours) * 2))

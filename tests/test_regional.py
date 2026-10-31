@@ -71,3 +71,35 @@ def test_region_settings_page(store):
     for page in ("Home", "Timetable", "Daily Log", "Stats", "Goals"):
         at.sidebar.radio[0].set_value(page).run()
         assert not at.exception, page
+
+
+def test_timetable_hours(store):
+    from arete import tools
+    import importlib
+    tools = importlib.reload(tools)
+    assert (store.SLOTS, store.slot_time(0), store.slot_time(store.SLOTS)) == (36, "07:00", "01:00")
+    tools.add_block("2026-10-29", "plan", "07:00", "08:00", "Run")
+    store.save_settings(day_start=5, day_end=23)                       # an early bird: 05:00-23:00
+    assert (store.SLOTS, store.slot_time(0), store.slot_time(store.SLOTS)) == (36, "05:00", "23:00")
+    tools.add_block("2026-10-29", "plan", "05:30", "06:30", "Swim", category="Exercise")
+    with pytest.raises(tools.ToolError, match="05:00 to 23:00"):
+        tools.add_block("2026-10-29", "plan", "23:00", "23:30", "Late", category="Rest")
+    store.save_settings(day_start=22, day_end=14)                     # night shifts: 22:00 to 14:00 next day
+    assert store.SLOTS == 32 and store.slot_of("03:00") == 10
+    assert store.free_runs("2026-10-29")                               # ...and the maths still works
+    store.save_settings(day_start=9, day_end=11)                      # too short: ignored, back to the default
+    assert store.day_hours() == (7, 1)
+    store.save_settings(day_start=7, day_end=1)
+    assert [b["label"] for b in store.blocks_between("2026-10-29", "2026-10-29")] == ["Run", "Swim"]   # nothing lost
+
+
+def test_timetable_hours_setting_page(store):
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at.sidebar.radio[0].set_value("Settings").run()
+    at.selectbox(key="region_day_start").set_value(6).run()
+    at.selectbox(key="region_day_end").set_value(0).run()
+    assert not at.exception and store.day_hours() == (6, 0) and store.SLOTS == 36
+    at.selectbox(key="region_day_end").set_value(8).run()               # 2 hours: refused
+    assert any("at least 6 hours" in e.value for e in at.error) and store.day_hours() == (6, 0)
+    at.sidebar.radio[0].set_value("Timetable").run()
+    assert not at.exception

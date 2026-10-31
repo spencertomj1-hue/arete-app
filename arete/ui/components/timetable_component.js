@@ -9,8 +9,8 @@
 // never makes the grid flicker back to old data.
 // Swiping sideways on the grid sends a "nav" trigger (-1 / +1 week).
 
-const SLOTS = 36;                 // 07:00 -> 01:00 in 30-minute slots
-const FIRST_MIN = 7 * 60;
+let SLOTS = 36;                   // 30-minute slots in a day (07:00 -> 01:00 by default; from Python)
+let FIRST_MIN = 7 * 60;           // the day's first minute
 const TRACKS = ["plan", "actual"];
 const SWIPE_THRESHOLD = 120;      // px of sideways scroll that flips a week
 
@@ -18,7 +18,7 @@ const SWIPE_THRESHOLD = 120;      // px of sideways scroll that flips a week
 
 const pad = (n) => String(n).padStart(2, "0");
 
-// Slot index (0..36) -> "HH:mm". Slot 36 is "01:00" (end of the last slot).
+// Slot index (0..SLOTS) -> "HH:mm". Slot SLOTS is the end of the last slot.
 function slotTime(i) {
   const m = (FIRST_MIN + 30 * i) % 1440;
   return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
@@ -38,7 +38,7 @@ function dayNum(iso) {
   return DATEFMT === "MM/DD/YYYY" ? `${m}/${d}` : DATEFMT === "YYYY-MM-DD" ? `${m}-${d}` : `${d}/${m}`;
 }
 
-// "HH:mm" -> slot index. Times before 07:00 are after midnight.
+// "HH:mm" -> slot index. Times before the day's start are after midnight.
 function slotOf(t) {
   const [h, m] = t.split(":").map(Number);
   let mins = h * 60 + m;
@@ -133,6 +133,8 @@ class Timetable {
   update(data) {
     this.data = data;
     CLOCK = data.clock || "24-hour";
+    SLOTS = data.slots || 36;
+    FIRST_MIN = data.firstMin ?? 7 * 60;
     DATEFMT = data.dateFormat || "DD/MM/YYYY";
     this.cats = new Map(data.categories.map((c) => [c.id, c]));
     this.dayIndex = new Map(data.days.map((d, i) => [d, i]));

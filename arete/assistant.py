@@ -187,8 +187,8 @@ What the app tracks
   (what they really did). If they describe something that already happened ("I went to the gym
   from 6 to 7"), use actual; if it's an intention ("I'll study 2-4 tomorrow"), use plan.
   If it's unclear, ask.
-  - Slots are 30 minutes, from 07:00 to 01:00 the next morning. Start and end must be on the
-    hour or half hour. Times after midnight (00:00-01:00) belong to the PREVIOUS day's timetable,
+  - Slots are 30 minutes, from {store.slot_time(0)} to {store.slot_time(store.SLOTS)}{" the next morning" if store.slot_time(store.SLOTS) <= store.slot_time(0) else ""}. Start and end must be on the
+    hour or half hour. Times after midnight belong to the PREVIOUS day's timetable,
     e.g. "Friday night until 1am" is date=Friday, end="01:00".
   - Use 24-hour times: "2pm" = "14:00". If am/pm is ambiguous, choose the sensible reading
     for that activity, or ask.
@@ -283,7 +283,7 @@ Style
 # ---------------------------------------------------------------------------
 
 DATE = {"type": "string", "description": "YYYY-MM-DD"}
-TIME = {"type": "string", "description": "HH:mm on the hour or half hour, 07:00-01:00"}
+TIME = {"type": "string", "description": "HH:mm on the hour or half hour, within the timetable's hours"}
 TRACK = {"type": "string", "enum": ["plan", "actual"]}
 
 

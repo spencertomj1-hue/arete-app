@@ -27,7 +27,9 @@ DB_PATH = Path(os.environ.get("ARETE_DB") or DATA_DIR / "life.db")
 # Habits appear as extra columns in the History table and CSV, named "habit: <name>".
 HABIT_PREFIX = "habit: "
 
-# Timetable: 36 half-hour slots from 07:00 to 01:00 the next day.
+# Timetable: half-hour slots from day_start to day_end (default 07:00 to 01:00 the next day,
+# 36 slots). Set in Settings -> Region; _apply_day_hours() keeps SLOTS and FIRST_MIN in step.
+DAY_START, DAY_END = 7, 1           # defaults (hours); an end at or before the start is the next morning
 SLOTS = 36
 FIRST_MIN = 7 * 60
 TRACKS = ("plan", "actual")
@@ -356,7 +358,31 @@ def save_settings(**changes):
     settings = {**load_settings(), **changes}
     settings_path().parent.mkdir(parents=True, exist_ok=True)
     settings_path().write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    if {"day_start", "day_end"} & set(changes):
+        _apply_day_hours()
     return settings
+
+
+def day_hours():
+    """(start hour, end hour) of a timetable day; an end at or before the start is the next morning."""
+    s = load_settings()
+    start, end = s.get("day_start", DAY_START), s.get("day_end", DAY_END)
+    ok = lambda h: isinstance(h, int) and 0 <= h <= 23
+    return (start, end) if ok(start) and ok(end) and day_length(start, end) >= MIN_DAY_HOURS else (DAY_START, DAY_END)
+
+
+MIN_DAY_HOURS = 6
+
+
+def day_length(start, end):
+    """Hours in a timetable day from start to end (wrapping past midnight; equal = a full 24 hours)."""
+    return (end - start) % 24 or 24
+
+
+def _apply_day_hours():
+    global SLOTS, FIRST_MIN
+    start, end = day_hours()
+    FIRST_MIN, SLOTS = start * 60, 2 * day_length(start, end)
 
 
 def _goals_became_todos(conn):
@@ -853,13 +879,13 @@ def resolve_category(label=None, category=None):
 # ---------------------------------------------------------------------------
 
 def slot_time(i):
-    """Slot index (0..36) -> "HH:mm". Slot 36 is "01:00" (end of the last slot)."""
+    """Slot index (0..SLOTS) -> "HH:mm". Slot SLOTS is the end of the last slot (01:00 by default)."""
     m = (FIRST_MIN + 30 * i) % 1440
     return f"{m // 60:02d}:{m % 60:02d}"
 
 
 def slot_of(t):
-    """"HH:mm" -> slot index. Times before 07:00 are after midnight."""
+    """"HH:mm" -> slot index. Times before the day's start (07:00 by default) are after midnight."""
     h, m = map(int, t.split(":"))
     mins = h * 60 + m
     if mins < FIRST_MIN:
@@ -1042,8 +1068,9 @@ def outlook_between(first, last):
 OUTLOOK_COLS = 'uid, date, start, "end", title, location, all_day, exact, description'
 
 
-def _visible_outlook(conn, day, s=0, e=SLOTS):
-    """Visible timed Outlook events on a timetable day overlapping slots s..e-1."""
+def _visible_outlook(conn, day, s=0, e=None):
+    """Visible timed Outlook events on a timetable day overlapping slots s..e-1 (e: the day's end)."""
+    e = SLOTS if e is None else e
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         f"SELECT {OUTLOOK_COLS} FROM tt_outlook WHERE date = ? AND all_day = 0 "
@@ -1122,11 +1149,12 @@ def outlook_category(title):
     return wanted if wanted in ids else (ids[0] if ids else wanted)
 
 
-def free_runs(day, first=0, last=SLOTS):
+def free_runs(day, first=0, last=None):
     """
     Free stretches of a day's Plan between slots first..last-1, as [(start, end)]
     slot pairs: no block of the user's and no (visible, timed) Outlook event in them.
     """
+    last = SLOTS if last is None else last
     busy = [False] * SLOTS
     for b in blocks_between(day, day, "plan"):
         for i in range(slot_of(b["start"]), min(slot_of(b["end"]), SLOTS)):
@@ -1892,3 +1920,6 @@ def get_stats(days=None, today=None):
         "habit_completion_pct": habits,
         "timetable_hours": hours,
     }
+
+
+_apply_day_hours()      # SLOTS / FIRST_MIN from settings.json (re-run when they change)

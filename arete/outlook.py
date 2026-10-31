@@ -5,7 +5,7 @@ is ever written back to Outlook).
   fetch()   download the published .ics (its link is kept only in the macOS Keychain)
   parse()   expand recurring events (with their exceptions) in a window of 14 days back to
             8 weeks ahead, convert to the user's time zone, skip cancelled events
-  to_rows() fit events to the timetable grid: 07:00-01:00, after-midnight slots belong to the
+  to_rows() fit events to the timetable grid (its hours, 07:00-01:00 by default); after-midnight slots belong to the
             day before, start rounds down / end rounds up to 30 minutes
   sync()    all of the above, storing the rows in tt_outlook. The last good .ics is cached,
             so when offline the timetable keeps showing the cached events.
@@ -37,8 +37,6 @@ DAYS_BACK = 14
 WEEKS_AHEAD = 8
 TIMEOUT = 10                               # seconds
 SLOT = timedelta(minutes=30)
-GRID_START = time(7, 0)                    # a timetable day runs 07:00 -> 01:00 the next day
-GRID_END = time(1, 0)
 
 
 class SyncError(Exception):
@@ -241,8 +239,8 @@ def _grid_rows(ev):
     rows = []
     day = s.date() - timedelta(days=1)          # an event at 00:30 belongs to the day before
     while day <= e.date():
-        g0 = datetime.combine(day, GRID_START, store.tz())
-        g1 = datetime.combine(day + timedelta(days=1), GRID_END, store.tz())
+        g0 = datetime.combine(day, time(store.FIRST_MIN // 60), store.tz())      # the timetable day's hours
+        g1 = g0 + timedelta(minutes=30 * store.SLOTS)
         a, b = max(s, g0), min(e, g1)            # clip to the grid
         if a < b:
             first = math.floor((a - g0) / SLOT)   # start rounds down
