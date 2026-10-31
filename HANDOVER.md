@@ -37,6 +37,7 @@ setup.ps1                      One-command install on Windows (venv, packages, S
 .github/workflows/tests.yml    Runs the tests on Windows, macOS and Linux for every push
 
 arete/                         The app's code, as a package (imported as `from arete import store`, ...)
+  regional.py                Week start, clock, date format, water units (display only; data stays HH:mm / ISO / litres): use its time() / day_month() / long_date() / water_text()
   system.py                    Everything that differs by OS: data folder, opening a folder, words for the UI
   store.py                     ALL SQL; timetable painting rules; settings.json; stats. No Streamlit.
   tools.py                     What Claude can do: plain functions over store.py, previews for destructive changes
@@ -209,6 +210,7 @@ Two different things:
 
 ## 9. Gotchas
 
+- **Week start:** weekly to-dos are stored under the week's first day, so `store.set_week_start` moves them (±1 day) when it changes. Use `store.week_start_of(day)`, never `day.weekday()`, for week maths.
 - **Time zone:** never use `date.today()` / `datetime.now()` for the user's day: use `store.local_today()` / `store.local_now()` / `store.stamp()`. The zone is settings.json "timezone" (Settings → Region) or the computer's (`tzlocal`). The tests pin Europe/London in conftest.
 - **Keyboard:** every page is checked by tabbing through it: each stop must show focus (Streamlit's controls draw their own; `appearance.apply_text_colours()` adds rings for the scrollable main area, links and `[tabindex]`; components have their own `:focus-visible`). Streamlit's "Skip to main content" link is the first stop. Headings use `anchor=False` (otherwise each adds an invisible "link to heading" stop). Dialogs close with Esc; the sidebar menu is one radio group (arrow keys).
 - **Contrast (WCAG AA):** text must be 4.5:1. Colours for each mode are in `.streamlit/config.toml` (`[theme.light]` / `[theme.dark]`: accent, red/orange/grey text). Components use `--muted` (mixed from the text colour, fine in both modes) rather than fixed greys; captions are overridden in `appearance.apply_text_colours()` (Streamlit fades them to 3.7:1). Don't fade text below `opacity: 0.72`. Check with axe-core's `color-contrast` rule in both modes after UI changes.
