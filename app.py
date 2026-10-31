@@ -20,6 +20,7 @@ from arete.ui import deadlines
 from arete.ui import todos
 from arete.ui import network
 from arete.ui import settings_ui
+from arete import regional
 from arete import store
 from arete import notify
 from arete.ui import timetable
@@ -54,7 +55,7 @@ def _agenda():
         rows.append(
             f'<div class="ag-row{" now" if current else ""}">'
             f'<span class="ag-dot" style="background:{colours.get(b["category_id"], "#999")}"></span>'
-            f'<span class="ag-time">{b["exact"] if b["outlook"] else b["start"] + "–" + b["end"]}</span>'
+            f'<span class="ag-time">{regional.times_in(b["exact"]) if b["outlook"] else regional.time_range(b["start"], b["end"])}</span>'
             f'<span class="ag-label">{escape(b["label"])}'
             f'{" <span class=ag-ol title=Outlook>Outlook</span>" if b["outlook"] else ""}</span>'
             f'{"<span class=ag-now>Now</span>" if current else ""}</div>'
@@ -68,7 +69,7 @@ def _agenda():
       .ag-row {{ display: flex; align-items: center; gap: 10px; padding: 2px 8px; border-radius: 7px; font-size: 0.86rem; }}
       .ag-row.now {{ background: rgba(128, 128, 128, 0.12); font-weight: 600; }}
       .ag-dot {{ width: 9px; height: 9px; border-radius: 3px; flex: none; }}
-      .ag-time {{ width: 6.5em; flex: none; opacity: 0.8; font-variant-numeric: tabular-nums; }}
+      .ag-time {{ min-width: 6.5em; white-space: nowrap; flex: none; opacity: 0.8; font-variant-numeric: tabular-nums; }}
       .ag-label {{ min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
       .ag-now {{ margin-left: auto; font-size: 0.72rem; font-weight: 600; color: #ff4b4b; }}
       .ag-empty {{ opacity: 0.78; font-size: 0.86rem; }}
@@ -128,7 +129,7 @@ def page_stats():
     a.metric("Avg mood", fmt(stats["avg_mood"]))
     b.metric("Avg sleep", fmt(stats["avg_sleep"], " h"))
     c.metric("Avg energy", fmt(stats["avg_energy"]))
-    d.metric("Avg water", fmt(stats["avg_water"], " L"))
+    d.metric("Avg water", regional.water_text(None if stats["avg_water"] is None else round(stats["avg_water"], 2)))
 
     # --- Line charts ---
     if entries.empty:
@@ -151,9 +152,9 @@ def page_stats():
         _date_axis(fig, stats)
         st.plotly_chart(fig, width="stretch")
 
-        water = entries.dropna(subset=["water"])
+        water = entries.dropna(subset=["water"]).assign(water=lambda df: df["water"].map(regional.water_out))
         if not water.empty:
-            fig = px.bar(water, x="date", y="water", title="Water", labels={"water": "Litres"},
+            fig = px.bar(water, x="date", y="water", title="Water", labels={"water": regional.water_unit().capitalize()},
                          color_discrete_sequence=["#3E8EF7"])
             fig.update_yaxes(rangemode="tozero")
             _date_axis(fig, stats)

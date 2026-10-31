@@ -311,6 +311,33 @@ def tz():
     return ZoneInfo(zone_name())
 
 
+# Weeks start on Monday, or Sunday if chosen (settings.json "week_start"; Settings -> Region).
+WEEK_START = {"Monday": 0, "Sunday": 6}
+
+
+def week_start_name():
+    name = load_settings().get("week_start")
+    return name if name in WEEK_START else "Monday"
+
+
+def week_start_of(day):
+    """The first day (Monday or Sunday) of the week containing `day`."""
+    day = _as_date(day)
+    return day - timedelta(days=(day.weekday() - WEEK_START[week_start_name()]) % 7)
+
+
+def set_week_start(name):
+    """Change the first day of the week, moving weekly to-dos to the new weeks' first days
+    (Monday -> the Sunday before it; Sunday -> the Monday after it)."""
+    if name not in WEEK_START or name == week_start_name():
+        return
+    shift = "-1 day" if name == "Sunday" else "+1 day"
+    with db() as conn:
+        conn.execute(f"UPDATE todos SET period_start = date(period_start, '{shift}') WHERE period = 'weekly'")
+        conn.execute(f"UPDATE todo_rollover SET period_start = date(period_start, '{shift}') WHERE period = 'weekly'")
+    save_settings(week_start=name)
+
+
 def local_now():
     """Now, as a plain (naive) date and time in the user's time zone."""
     return datetime.now(tz()).replace(tzinfo=None)
@@ -581,17 +608,17 @@ def set_habit_target(habit_id, per_week):
 
 
 def week_ticks(done_dates, day):
-    """How many times it was ticked in the week (Monday to Sunday) containing `day`."""
-    monday = _as_date(day) - timedelta(days=_as_date(day).weekday())
-    return sum((monday + timedelta(days=i)).isoformat() in done_dates for i in range(7))
+    """How many times it was ticked in the week containing `day`."""
+    first = week_start_of(day)
+    return sum((first + timedelta(days=i)).isoformat() in done_dates for i in range(7))
 
 
 def weekly_streaks(done_dates, per_week, today=None):
     """(current, best) runs of weeks that hit the target. This week counts once it's hit;
     until then the streak runs to last week, so it doesn't break before the week is over."""
     today = today or local_today()
-    this_monday = today - timedelta(days=today.weekday())
-    mondays = sorted({d - timedelta(days=d.weekday()) for d in map(date.fromisoformat, done_dates)})
+    this_monday = week_start_of(today)                      # (the first day of the week: Monday or Sunday)
+    mondays = sorted({week_start_of(d) for d in map(date.fromisoformat, done_dates)})
     hit = {m for m in mondays if week_ticks(done_dates, m) >= per_week}
     best = run = 0
     prev = None
@@ -1148,7 +1175,7 @@ def start_of_period(period, day):
     if period == "daily":
         return day
     if period == "weekly":
-        return day - timedelta(days=day.weekday())
+        return week_start_of(day)
     if period == "monthly":
         return day.replace(day=1)
     if period == "yearly":

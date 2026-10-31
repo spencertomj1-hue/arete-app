@@ -14,6 +14,7 @@ from pathlib import Path
 import streamlit as st
 
 from arete import outlook
+from arete import regional
 from arete import store
 
 HERE = Path(__file__).parent
@@ -134,7 +135,7 @@ def _sync_text():
 
 def render_page():
     day = st.session_state.setdefault("tt_day", store.local_today())
-    monday = day - timedelta(days=day.weekday())
+    monday = store.week_start_of(day)            # the week's first day: Monday, or Sunday if chosen
     # Add block / Fit time / Categories: the same things Claude can do, by hand.
     from arete.ui import timetable_tools
     timetable_tools.toolbar(day)
@@ -176,7 +177,7 @@ def render_grid(days, key="timetable", single=False, readonly=False):
         "showOutlook": show_outlook,
         "outlook": [
             {"id": e["uid"], "date": e["date"], "start": e["start"], "end": e["end"], "title": e["title"],
-             "location": e["location"], "exact": e["exact"], "description": e["description"],
+             "location": e["location"], "exact": regional.times_in(e["exact"]), "description": e["description"],
              "details": store.outlook_details(e), "categoryId": store.outlook_category(e["title"])}
             for e in events if not e["all_day"]
         ],
@@ -184,6 +185,8 @@ def render_grid(days, key="timetable", single=False, readonly=False):
         + [{"date": d["due"], "title": f"Due: {d['title']}", "deadline": True} for d in store.deadlines()
            if days[0].isoformat() <= d["due"] <= days[-1].isoformat()],
         "sync": _sync_text(),
+        "clock": regional.clock(),
+        "dateFormat": regional.date_format(),
     }
     _timetable_component(data=data, key=key,
                          on_ops_change=lambda: _on_ops(key), on_nav_change=lambda: _on_nav(key),

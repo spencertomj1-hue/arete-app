@@ -24,6 +24,20 @@ function slotTime(i) {
   return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
 }
 
+// How times and dates are shown (Settings -> Region); data stays "HH:mm" and ISO dates.
+let CLOCK = "24-hour", DATEFMT = "DD/MM/YYYY";
+function fmtTime(t) {
+  if (!t || CLOCK !== "12-hour") return t;
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}${m ? ":" + pad(m) : ""} ${h < 12 ? "am" : "pm"}`;
+}
+const fmtRange = (a, b) => `${fmtTime(a)}–${fmtTime(b)}`;
+const LOC = () => (DATEFMT === "MM/DD/YYYY" ? "en-US" : "en-GB");     // the order of day and month in words
+function dayNum(iso) {
+  const [, m, d] = iso.split("-");
+  return DATEFMT === "MM/DD/YYYY" ? `${m}/${d}` : DATEFMT === "YYYY-MM-DD" ? `${m}-${d}` : `${d}/${m}`;
+}
+
 // "HH:mm" -> slot index. Times before 07:00 are after midnight.
 function slotOf(t) {
   const [h, m] = t.split(":").map(Number);
@@ -43,6 +57,10 @@ const PIN_ICON = '<svg class="cal-ic" viewBox="0 0 24 24"><path d="M12 21s-6-5.6
 function weekTitle(first, last) {
   const a = new Date(first + "T00:00"), b = new Date(last + "T00:00");
   const mon = (d) => d.toLocaleDateString("en-GB", { month: "short" });
+  if (DATEFMT === "MM/DD/YYYY") {                 // "Oct 26 – 31, 2026" / "Oct 26 – Nov 1, 2026"
+    const end = a.getMonth() === b.getMonth() ? `${b.getDate()}` : `${mon(b)} ${b.getDate()}`;
+    return `${mon(a)} ${a.getDate()} – ${end}, ${b.getFullYear()}`;
+  }
   const start = a.getMonth() === b.getMonth() ? `${a.getDate()}` : `${a.getDate()} ${mon(a)}`;
   return `${start} – ${b.getDate()} ${mon(b)} ${b.getFullYear()}`;
 }
@@ -114,6 +132,8 @@ class Timetable {
 
   update(data) {
     this.data = data;
+    CLOCK = data.clock || "24-hour";
+    DATEFMT = data.dateFormat || "DD/MM/YYYY";
     this.cats = new Map(data.categories.map((c) => [c.id, c]));
     this.dayIndex = new Map(data.days.map((d, i) => [d, i]));
 
@@ -251,9 +271,8 @@ class Timetable {
     const dayHead = days
       .map((d) => {
         const dt = new Date(d + "T00:00");
-        const name = dt.toLocaleDateString("en-GB", { weekday: "long" });
-        const [, m, day] = d.split("-");
-        return `<th colspan="2" class="day ${d === today ? "today" : ""}"><div class="dn">${name}</div><div class="dd">${day}/${m}</div><div class="chips" data-d="${days.indexOf(d)}"></div></th>`;
+        const name = dt.toLocaleDateString(LOC(), { weekday: "long" });
+        return `<th colspan="2" class="day ${d === today ? "today" : ""}"><div class="dn">${name}</div><div class="dd">${dayNum(d)}</div><div class="chips" data-d="${days.indexOf(d)}"></div></th>`;
       })
       .join("");
     const subHead = days.map(() => `<th class="sub first">Plan</th><th class="sub">Actual</th>`).join("");
@@ -265,7 +284,7 @@ class Timetable {
           `<td class="s ${t === "plan" ? "first" : ""} ${d === today ? "today" : ""}" data-d="${di}" data-t="${t}" data-s="${s}"></td>`).join(""))
         .join("");
       // Label each hour on its grid line, like a calendar.
-      const time = s % 2 === 0 ? `<span>${slotTime(s)}</span>` : "";
+      const time = s % 2 === 0 ? `<span>${fmtTime(slotTime(s))}</span>` : "";
       rows.push(`<tr class="${s % 2 ? "half" : "hour"}"><td class="t">${time}</td>${cells}</tr>`);
     }
 
@@ -276,7 +295,7 @@ class Timetable {
     this.root.innerHTML = `
       <div class="tt-head">
         <div class="tt-title">${this.data.single
-          ? new Date(days[0] + "T00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })
+          ? new Date(days[0] + "T00:00").toLocaleDateString(LOC(), { weekday: "long", day: "numeric", month: "long" })
           : weekTitle(days[0], days[days.length - 1])}</div>
         <div class="tt-nav">
           <button data-nav="-1" title="Previous week">‹</button>
@@ -368,7 +387,7 @@ class Timetable {
       if (e <= s) continue;
       for (let i = s; i < e; i++) {
         const td = this.cells[di][en.track][i];
-        td.title = `${en.label} · ${en.start}–${en.end}`;
+        td.title = `${en.label} · ${fmtRange(en.start, en.end)}`;
         td.classList.add("filled");
         this.occupant[di][en.track][i] = en.id;
       }
@@ -409,11 +428,11 @@ class Timetable {
     if (!list) return;
     this.listed = [...this.blocks].sort((x, y) => x.di - y.di || x.s - y.s || (x.en.track < y.en.track ? -1 : 1));
     const groups = this.data.days.map((d, di) => {
-      const day = new Date(d + "T00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+      const day = new Date(d + "T00:00").toLocaleDateString(LOC(), { weekday: "long", day: "numeric", month: "long" });
       const items = this.listed.map((b, i) => [b, i]).filter(([b]) => b.di === di).map(([b, i]) => {
         const cat = this.cats.get(b.en.categoryId);
         const what = `${b.outlook ? "Plan (Outlook)" : b.en.track === "plan" ? "Plan" : "Actual"}: ${b.en.label}, ` +
-          `${b.outlook ? b.en.exact : `${b.en.start} to ${b.en.end}`}${cat ? `, ${cat.name}` : ""}`;
+          `${b.outlook ? b.en.exact : `${fmtTime(b.en.start)} to ${fmtTime(b.en.end)}`}${cat ? `, ${cat.name}` : ""}`;
         return `<button data-i="${i}">${esc(what)}</button>`;
       });
       return items.length ? `<div role="group" aria-label="${esc(day)}"><span class="a11y-day">${esc(day)}</span>${items.join("")}</div>` : "";
@@ -461,7 +480,7 @@ class Timetable {
         }
         return `<div class="blk ${tall ? "tall" : ""} ${this.focusId === en.id ? "focus" : ""}" data-id="${esc(en.id)}" style="left:${first.left - origin.left}px;top:${first.top - origin.top}px;` +
           `width:${first.width}px;height:${last.bottom - first.top}px;background:${esc(bg)};color:${fg}">` +
-          `<b>${esc(en.label)}</b>${tall ? `<span>${esc(en.start)}–${esc(en.end)}</span>` : ""}</div>`;
+          `<b>${esc(en.label)}</b>${tall ? `<span>${esc(fmtRange(en.start, en.end))}</span>` : ""}</div>`;
       })
       .join("");
   }
@@ -658,11 +677,11 @@ class Timetable {
     const options = this.data.categories
       .map((c) => `<option value="${esc(c.id)}" ${c.id === entry.categoryId ? "selected" : ""}>${esc(c.name)}</option>`)
       .join("");
-    const day = new Date(entry.date + "T00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+    const day = new Date(entry.date + "T00:00").toLocaleDateString(LOC(), { weekday: "short", day: "numeric", month: "short" });
     const pop = document.createElement("div");
     pop.className = "tt-pop";
     pop.innerHTML = `
-      <div><b>${day} · ${esc(entry.start)}–${esc(entry.end)}</b> · ${entry.track === "plan" ? "Plan" : "Actual"}</div>
+      <div><b>${day} · ${esc(fmtRange(entry.start, entry.end))}</b> · ${entry.track === "plan" ? "Plan" : "Actual"}</div>
       <input class="p-label" list="tt-labels" value="${esc(entry.label)}">
       <select class="p-cat">${options}</select>
       <textarea class="p-details" rows="2" placeholder="Description (optional)">${esc(entry.details || "")}</textarea>
@@ -716,8 +735,8 @@ class Timetable {
     const item = hit.outlook ? hit.ev : hit.entry;
     const blockId = hit.outlook ? `outlook:${item.id}` : item.id;
     const cat = this.cats.get(item.categoryId);
-    const day = new Date(item.date + "T00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-    const when = hit.outlook ? item.exact : `${item.start}–${item.end}`;
+    const day = new Date(item.date + "T00:00").toLocaleDateString(LOC(), { weekday: "long", day: "numeric", month: "long" });
+    const when = hit.outlook ? item.exact : fmtRange(item.start, item.end);
     const text = hit.outlook ? item.description : item.details;
     const title = hit.outlook ? item.title : item.label;
 

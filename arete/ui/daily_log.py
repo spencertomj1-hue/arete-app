@@ -13,6 +13,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from arete import regional
 from arete import store
 
 HERE = Path(__file__).parent
@@ -26,7 +27,7 @@ _calendar_component = st.components.v2.component(
 
 
 def nice_date(d):
-    return f"{d:%A} {d.day} {d:%B}"
+    return regional.long_date(d)
 
 
 # The journal box's placeholder: the same prompt all day, a different one each day.
@@ -82,14 +83,16 @@ def page_daily_log():
     month = st.session_state.setdefault("log_month", today.replace(day=1))
 
     # --- Month calendar (6 weeks from the Monday on/before the 1st) ---
-    first = month - timedelta(days=month.weekday())
+    first = store.week_start_of(month)
     entries = store.entries_between(first.isoformat(), (first + timedelta(days=41)).isoformat())
     _calendar_component(
         data={
             "month": f"{month:%Y-%m}",
             "today": today.isoformat(),
             "selected": selected.isoformat(),
-            "days": {e["date"]: {k: e[k] for k in ("mood", "sleep", "energy", "water", "notes")}
+            "weekStart": regional.week_start(), "weekdays": regional.weekday_names(), "waterUnit": regional.water_short(),
+            "days": {e["date"]: {k: e[k] for k in ("mood", "sleep", "energy", "notes")}
+                     | {"water": regional.water_out(e["water"])}
                      for e in entries.to_dict("records")},
         },
         key="log_calendar", on_select_change=_on_select, on_nav_change=_on_month,
@@ -105,7 +108,7 @@ def page_daily_log():
             a.metric("Mood", f"{entry['mood']}/5" if entry.get("mood") else "–")
             b.metric("Sleep", f"{entry['sleep']:g} h" if entry.get("sleep") is not None else "–")
             c.metric("Energy", f"{entry['energy']}/5" if entry.get("energy") else "–")
-            w.metric("Water", f"{entry['water']:g} L" if entry.get("water") is not None else "–")
+            w.metric("Water", regional.water_text(entry.get("water")))
             st.markdown(entry["notes"].replace("\n", "  \n") if entry.get("notes") else "*No journal entry.*")
         else:
             st.caption("Nothing logged for this day yet.")
@@ -126,13 +129,16 @@ def page_daily_log():
             "Sleep (hours)", 0.0, 24.0, float(entry.get("sleep") or 7.0), step=0.5, key=f"sleep_{v}"
         )
         energy = st.slider("Energy", 1, 5, int(entry.get("energy") or 3), key=f"energy_{v}")
-        water = st.number_input("Water (litres)", 0.0, 15.0, entry.get("water"), step=0.25, format="%.2f",
-                                placeholder="e.g. 2", key=f"water_{v}", help="Leave empty if you didn't track it.")
+        litres = regional.water_unit() == "litres"
+        water = st.number_input(f"Water ({regional.water_unit()})", 0.0, 15.0 if litres else 500.0,
+                                regional.water_out(entry.get("water")),
+                                step=0.25 if litres else 4.0, format="%.2f" if litres else "%.0f",
+                                placeholder="e.g. 2", key=f"water_{v}_{regional.water_unit()}", help="Leave empty if you didn't track it.")
         notes = st.text_area("Journal", entry.get("notes") or "", height=260, key=f"notes_{v}",
                              placeholder=prompt_for(selected), help="The day's notes: write as much as you like.")
         if st.form_submit_button(f"Save {nice_date(selected)}", type="primary"):
             with store.db() as conn:
-                store.save_entry(conn, d, mood, sleep, energy, notes.strip() or None, water)
+                store.save_entry(conn, d, mood, sleep, energy, notes.strip() or None, regional.water_in(water))
             st.toast(f"Saved {nice_date(selected)}.")
             st.rerun()   # refresh the calendar
     if entry:
@@ -158,7 +164,7 @@ def _past_entries():
         d = store._as_date(e["date"])
         first_line = e["text"].strip().splitlines()[0]
         preview = first_line[:70] + ("…" if len(first_line) > 70 else "")
-        with st.expander(f"**{d:%a} {d.day} {d:%b %Y}** · {preview}", expanded=bool(query) and len(entries) <= 3):
+        with st.expander(f"**{regional.day_month(d, year=True)}** · {preview}", expanded=bool(query) and len(entries) <= 3):
             st.markdown(e["text"].replace("\n", "  \n"))
             st.button("Open this day", key=f"journal_open_{e['date']}", on_click=_open_day, args=(d,),
                       icon=":material/edit:")

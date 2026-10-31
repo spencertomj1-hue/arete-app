@@ -27,7 +27,9 @@ export default function (component) {
 
   const [y, m] = data.month.split("-").map(Number);
   const first = new Date(y, m - 1, 1);
-  const start = new Date(y, m - 1, 1 - ((first.getDay() + 6) % 7));   // the Monday on/before the 1st
+  const firstDow = data.weekStart === "Sunday" ? 0 : 1;               // weeks start on Monday, or Sunday
+  const start = new Date(y, m - 1, 1 - ((first.getDay() - firstDow + 7) % 7));   // that day on/before the 1st
+  const waterUnit = data.waterUnit || "L";
   const title = first.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 
   const cells = [];
@@ -43,7 +45,7 @@ export default function (component) {
     // What a screen reader says for the day, e.g. "Friday 30 October: mood 4, slept 7.5 hours, energy 3, has notes".
     const said = [d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }),
       [e.mood != null && `mood ${e.mood}`, e.sleep != null && `slept ${+e.sleep} hours`,
-       e.energy != null && `energy ${e.energy}`, e.water != null && `drank ${+e.water} litres`, e.notes && "has notes"].filter(Boolean).join(", ") || "nothing logged"]
+       e.energy != null && `energy ${e.energy}`, e.water != null && `drank ${+e.water} ${waterUnit === "L" ? "litres" : waterUnit}`, e.notes && "has notes"].filter(Boolean).join(", ") || "nothing logged"]
       .join(": ");
     const stat = (kind, value, extra = "") =>
       value == null ? "" : `<span class="stat ${kind}" ${extra}>${ICON[kind]}${esc(value)}</span>`;
@@ -55,7 +57,7 @@ export default function (component) {
           ${stat("mood", e.mood, e.mood ? `style="--c:${MOOD_COLOURS[e.mood]}"` : "")}
           ${stat("sleep", e.sleep == null ? null : `${+e.sleep}h`)}
           ${stat("energy", e.energy)}
-          ${stat("water", e.water == null ? null : `${+e.water}L`)}
+          ${stat("water", e.water == null ? null : `${+e.water}${waterUnit === "L" ? "L" : " oz"}`)}
         </span>
       </button>`);
   }
@@ -76,7 +78,7 @@ export default function (component) {
       </div>
     </div>
     <div class="cal-grid" role="group" aria-label="${title}">
-      ${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((n) => `<div class="dow">${n}</div>`).join("")}
+      ${(data.weekdays || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]).map((n) => `<div class="dow">${n}</div>`).join("")}
       ${cells.join("")}
     </div>`;
 

@@ -18,6 +18,7 @@ import streamlit as st
 from arete import assistant
 from arete import outlook
 from arete import setup_checks
+from arete import regional
 from arete import store
 from arete import system
 
@@ -332,7 +333,32 @@ def region_section():
             store.save_settings(timezone=pick)
             st.rerun()
     now = store.local_now()
-    st.markdown(f"It's **{now:%A} {now.day} {now:%B}, {now:%H:%M}** in {store.zone_name().replace('_', ' ')}.")
+    st.markdown(f"It's **{regional.long_date(now)}, {regional.time(f'{now:%H:%M}')}** in "
+                f"{store.zone_name().replace('_', ' ')}.")
+
+    st.subheader("Dates, times and units")
+    a, b = st.columns(2)
+    week = a.segmented_control("Weeks start on", list(regional.WEEK_STARTS), default=regional.week_start(),
+                               key="region_week", help="For the timetable, the calendar, weekly to-dos and habits.")
+    clock = b.segmented_control("Clock", regional.CLOCKS, default=regional.clock(), key="region_clock")
+    a, b = st.columns(2)
+    fmt = a.selectbox("Dates", list(regional.DATE_FORMATS), index=list(regional.DATE_FORMATS).index(regional.date_format()),
+                      format_func=lambda f: f"{f} ({regional.DATE_FORMATS[f]})", key="region_date")
+    water = b.segmented_control("Water", regional.WATER_UNITS, default=regional.water_unit(), key="region_water")
+    changed = False
+    if week and week != regional.week_start():
+        store.set_week_start(week)           # also moves weekly to-dos to the new weeks
+        changed = True
+    for key, value, current in (("clock", clock, regional.clock()), ("date_format", fmt, regional.date_format()),
+                                ("water_unit", water, regional.water_unit())):
+        if value and value != current:
+            store.save_settings(**{key: value})
+            changed = True
+    if changed:
+        st.rerun()
+    sample = store.local_today()
+    st.caption(f"Example: {regional.long_date(sample)} · {regional.numeric_date(sample)} · "
+               f"{regional.time_range('09:00', '17:30')} · {regional.water_text(2.0)}")
 
 
 def page_settings():

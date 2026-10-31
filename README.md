@@ -95,7 +95,7 @@ Claude only changes Arete's data, through a fixed set of actions. **Anything tha
 **Outlook calendar (optional).** Your published Outlook calendar appears in the timetable's Plan column, and you can remove or adjust any event. It's read only: nothing is ever written back to Outlook.
 
 **Settings.**
-- Region: time zone (your computer's, or pick one)
+- Region: time zone (your computer's, or pick one), week starting Monday or Sunday, 12- or 24-hour clock, date format, and water in litres or US fl oz
 - Appearance: light, dark, or follow your computer, and text size (Small, Normal, Large, Extra large)
 - Calendar connection
 - Claude sign-in status

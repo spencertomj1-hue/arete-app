@@ -12,6 +12,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from arete import regional
 from arete import store
 
 HERE = Path(__file__).parent
@@ -116,7 +117,7 @@ def _person_dialog(person_id):
     st.markdown("**Times you've met or spoken**")
     with st.form(f"net_meet_{person_id}", clear_on_submit=True, border=False):
         a, b, c = st.columns([2, 5, 2], vertical_alignment="bottom")
-        when = a.date_input("When", value=store.local_today(), format="DD/MM/YYYY")
+        when = a.date_input("When", value=store.local_today(), format=regional.input_format())
         note = b.text_input("What happened", placeholder="e.g. Coffee; talked about her thesis")
         if c.form_submit_button("Add", icon=":material/add:") and note.strip():
             store.add_interaction(person_id, note, when)
@@ -128,7 +129,7 @@ def _person_dialog(person_id):
     for item in history:
         left, right = st.columns([6, 1], vertical_alignment="center")
         d = store._as_date(item["date"])
-        left.markdown(f"**{d:%a} {d.day} {d:%b %Y}** · {item['note']}")     # (no %-d: Windows lacks it)
+        left.markdown(f"**{regional.day_month(d, year=True)}** · {item['note']}")
         if right.button("", icon=":material/delete:", key=f"net_meet_del_{item['id']}", help="Remove this"):
             store.delete_interaction(item["id"])
             st.rerun(scope="fragment")

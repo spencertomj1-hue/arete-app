@@ -10,6 +10,7 @@ from html import escape
 
 import streamlit as st
 
+from arete import regional
 from arete import store
 
 HOME_LIMIT = 5
@@ -58,7 +59,7 @@ def _edit_dialog(did):
         return
     with st.form(f"dl_edit_{did}", border=False):
         title = st.text_input("What's due", d["title"])
-        due = st.date_input("Due", store._as_date(d["due"]), format="DD/MM/YYYY")
+        due = st.date_input("Due", store._as_date(d["due"]), format=regional.input_format())
         notes = st.text_area("Notes", d["notes"] or "", height=80)
         if st.form_submit_button("Save", type="primary"):
             if not title.strip():
@@ -86,7 +87,7 @@ def _row(d, today):
     title.markdown(f"~~{d['title']}~~" if d["done"] else f"**{d['title']}**"
                    + (f"  \n:gray[{d['notes']}]" if d["notes"] else ""))
     due = store._as_date(d["due"])
-    text = f"{due:%a} {due.day} {due:%b}" + ("" if d["done"] else f" · {store.countdown(due, today)}")
+    text = regional.day_month(due) + ("" if d["done"] else f" · {store.countdown(due, today)}")
     when.markdown(f"{tone}[{text}]" if tone and not d["done"] else text)
     if edit.button("", icon=":material/edit:", key=f"dl_edit_btn_{d['id']}", help="Edit or delete"):
         _edit_dialog(d["id"])
@@ -109,7 +110,7 @@ def render_section():
         with st.form("dl_new", clear_on_submit=True, border=False):
             a, b, c = st.columns([5, 2, 1], vertical_alignment="bottom")
             title = a.text_input("New deadline", placeholder="e.g. Essay, Internship application")
-            due = b.date_input("Due", today + timedelta(days=7), format="DD/MM/YYYY")
+            due = b.date_input("Due", today + timedelta(days=7), format=regional.input_format())
             if c.form_submit_button("Add", icon=":material/add:") and title.strip():
                 store.add_deadline(title, due)
                 st.rerun()

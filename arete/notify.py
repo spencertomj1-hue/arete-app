@@ -14,7 +14,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from arete import store, system
+from arete import regional, store, system
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def due(now, minutes, sent):
             continue
         left = round((starts - now).total_seconds() / 60)
         when = "now" if left <= 0 else f"in {left} min"
-        body = f"{b['start']}–{b['end']}, {when}"
+        body = f"{regional.time_range(b['start'], b['end'])}, {when}"
         if b.get("details"):
             body += f"\n{str(b['details']).splitlines()[0][:100]}"
         out.append((key, b["label"] or "Next block", body))

@@ -15,6 +15,7 @@ import re
 
 import streamlit as st
 
+from arete import regional
 from arete import store
 from arete import tools
 
@@ -90,12 +91,12 @@ def _add_block_dialog(day):
         return
     with st.form("tt_add_form", border=False):
         a, b = st.columns(2)
-        when = a.date_input("Day", value=day, format="DD/MM/YYYY")
+        when = a.date_input("Day", value=day, format=regional.input_format())
         track = b.segmented_control("Column", ["Plan", "Actual"], default="Plan",
                                     help="Plan: what you intend to do. Actual: what you really did.")
         a, b = st.columns(2)
-        start = a.selectbox("From", _times(0, store.SLOTS - 1), index=4)
-        end = b.selectbox("To", _times(1, store.SLOTS), index=5, help="Times after midnight count as the same day.")
+        start = a.selectbox("From", _times(0, store.SLOTS - 1), index=4, format_func=regional.time)
+        end = b.selectbox("To", _times(1, store.SLOTS), index=5, format_func=regional.time, help="Times after midnight count as the same day.")
         label = st.text_input("What", placeholder="e.g. Lecture, Gym, Revision")
         category = st.selectbox("Category", [AUTO] + _category_names())
         details = st.text_area("Details (optional)", height=80)
@@ -128,12 +129,12 @@ def _fit_dialog(day, label="", last=None, category=None):
         category = st.selectbox("Category", options, key="tt_fit_cat",
                                 index=options.index(category) if category in options else 0)
         a, b = st.columns(2)
-        span = a.date_input("Between", value=(first, last), format="DD/MM/YYYY",
+        span = a.date_input("Between", value=(first, last), format=regional.input_format(),
                             help="Pick the first and last day.")
         longest = b.number_input("Longest sitting (hours)", 0.5, 8.0, 2.0, step=0.5)
         a, b, c = st.columns([1, 1, 1], vertical_alignment="bottom")
-        earliest = a.selectbox("Not before", _times(0, store.SLOTS - 1), index=4)
-        latest = b.selectbox("Not after", _times(1, store.SLOTS), index=28)
+        earliest = a.selectbox("Not before", _times(0, store.SLOTS - 1), index=4, format_func=regional.time)
+        latest = b.selectbox("Not after", _times(1, store.SLOTS), index=28, format_func=regional.time)
         weekdays = c.checkbox("Weekdays only")
         if st.form_submit_button("Find times", type="primary", icon=":material/event_available:"):
             if not label.strip():

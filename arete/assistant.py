@@ -33,6 +33,7 @@ from claude_agent_sdk import (
     ClaudeAgentOptions, CLINotFoundError, ResultMessage, create_sdk_mcp_server, query, tool,
 )
 
+from arete import regional
 from arete import store
 from arete import system
 from arete import tools
@@ -170,7 +171,9 @@ You change their data only through the arete tools. You have no other tools.
 
 Right now it is {now:%A %d %B %Y, %H:%M} ({store.zone_name()}). Today's date is {now:%Y-%m-%d}.
 Work out relative dates ("tomorrow", "next Tuesday", "last night") from this, and always pass
-dates to tools as YYYY-MM-DD. Weeks start on Monday.
+dates to tools as YYYY-MM-DD. Weeks start on {store.week_start_name()}. Tools always take 24-hour
+"HH:mm" times and litres; the user sees {regional.clock()} times and water in {regional.water_unit()}, so
+use those when talking to them (e.g. "64 oz" -> water=1.89).
 
 What the app tracks
 - Daily log: per date, mood 1-5, sleep hours, energy 1-5, water drunk (litres) and the day's notes,
@@ -178,7 +181,7 @@ What the app tracks
   water is the day's total: for "another 500 ml", check the day first (query_entries) and add to it.
 - Habits: named habits ticked per day, with streaks (set_habit, add_habit, list_habits). A habit is
   either every day or has a weekly target ("gym 3 times a week" -> add_habit("Gym", times_per_week=3),
-  or set_habit_target for an existing one); weekly ones count ticks per Monday-Sunday week.
+  or set_habit_target for an existing one); weekly ones count ticks per week.
   Only add a new habit if the user clearly asks for one.
 - Timetable: every day has two tracks, "plan" (what they intend to do) and "actual"
   (what they really did). If they describe something that already happened ("I went to the gym
@@ -212,7 +215,7 @@ What the app tracks
   add_deadline(title, due). They show on Home with a countdown. complete_deadline ticks one off;
   edit_deadline changes it; delete_deadline needs confirmation. To make time for one, use plan_time
   with end_date the day before it's due.
-- To-dos: tick-off lists for a day, a week (Monday to Sunday) or a month (period "daily", "weekly" or
+- To-dos: tick-off lists for a day, a week or a month (period "daily", "weekly" or
   "monthly"), shown on the Home page. A to-do belongs to the period containing its date (default today).
   Users often call these "goals" ("add go gym to this week's goals", "today's goals"): anything for a
   day or a week, or anything you tick off, is a to-do.
