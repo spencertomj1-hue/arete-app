@@ -117,7 +117,7 @@ def _fit_dialog(day, label="", last=None, category=None):
                "hours over the days, with a break between sittings. You'll see the times before anything is added.")
     if _confirm_box("Add to Plan"):
         return
-    today = store.london_today()
+    today = store.local_today()
     first = max(day, today)
     last = max(first, last) if last else first + timedelta(days=6)
     with st.form("tt_fit_form", border=False):
@@ -227,7 +227,7 @@ def open_fit(label, last):
     """Fit time for something specific (e.g. a deadline), finishing by `last`."""
     st.session_state.pop(PENDING, None)
     names = _category_names()
-    _fit_dialog(store.london_today(), label, last, "Study" if "Study" in names else None)
+    _fit_dialog(store.local_today(), label, last, "Study" if "Study" in names else None)
 
 
 def toolbar(day):

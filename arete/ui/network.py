@@ -116,7 +116,7 @@ def _person_dialog(person_id):
     st.markdown("**Times you've met or spoken**")
     with st.form(f"net_meet_{person_id}", clear_on_submit=True, border=False):
         a, b, c = st.columns([2, 5, 2], vertical_alignment="bottom")
-        when = a.date_input("When", value=store.london_today(), format="DD/MM/YYYY")
+        when = a.date_input("When", value=store.local_today(), format="DD/MM/YYYY")
         note = b.text_input("What happened", placeholder="e.g. Coffee; talked about her thesis")
         if c.form_submit_button("Add", icon=":material/add:") and note.strip():
             store.add_interaction(person_id, note, when)
@@ -208,7 +208,7 @@ def render_page():
         "people": [{"id": p["id"], "name": p["name"], "description": p["description"],
                     "worksFor": p["works_for"], "groupId": p["group_id"],
                     "recent": store.interactions_of(p["id"], limit=3)} for p in store.net_people()],
-        "today": store.london_today().isoformat(),
+        "today": store.local_today().isoformat(),
         "ai": store.ai_enabled(),
         "links": store.net_links(),
         "groups": store.net_groups(),

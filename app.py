@@ -32,7 +32,7 @@ from arete.store import entries_between, get_stats, init_db
 
 def _agenda():
     """Today's plan (own blocks and Outlook events) as a short list, the current one highlighted."""
-    today = date.today().isoformat()
+    today = store.local_today().isoformat()
     blocks = [{**b, "outlook": False} for b in store.blocks_between(today, today, "plan")]
     all_day = []
     if st.session_state.get("tt_show_outlook", True):
@@ -45,7 +45,7 @@ def _agenda():
     all_day += [f"Due: {d['title']}" for d in store.deadlines() if d["due"] == today]
     blocks.sort(key=lambda b: store.slot_of(b["start"]))
     colours = dict(zip(*[store.load_categories()[c] for c in ("id", "colour")]))
-    now = datetime.now()
+    now = store.local_now()
     now_slot = store.slot_of(f"{now:%H}:{now.minute // 30 * 30:02d}")
 
     rows = []

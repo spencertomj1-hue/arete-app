@@ -74,7 +74,7 @@ def _on_ops(key):
 def _shift_week(weeks):
     """Prev/next/this-week callback (also used by sideways swipes on the grid)."""
     if weeks == 0:
-        st.session_state["tt_day"] = date.today()
+        st.session_state["tt_day"] = store.local_today()
     else:
         st.session_state["tt_day"] += timedelta(weeks=weeks)
 
@@ -133,7 +133,7 @@ def _sync_text():
 # ---------------------------------------------------------------------------
 
 def render_page():
-    day = st.session_state.setdefault("tt_day", date.today())
+    day = st.session_state.setdefault("tt_day", store.local_today())
     monday = day - timedelta(days=day.weekday())
     # Add block / Fit time / Categories: the same things Claude can do, by hand.
     from arete.ui import timetable_tools
@@ -143,7 +143,7 @@ def render_page():
 
 def render_today():
     """Just today's Plan / Actual (the Home page): same grid, view only, no week navigation."""
-    render_grid([date.today()], key="timetable_today", single=True, readonly=True)
+    render_grid([store.local_today()], key="timetable_today", single=True, readonly=True)
 
 
 def render_grid(days, key="timetable", single=False, readonly=False):
@@ -156,7 +156,7 @@ def render_grid(days, key="timetable", single=False, readonly=False):
 
     data = {
         "days": [d.isoformat() for d in days],
-        "today": date.today().isoformat(),
+        "today": store.local_today().isoformat(),
         "groups": store.groups(),
         "categories": [
             {"id": r.id, "name": r.name, "colour": r.colour, "textColour": r.text_colour,

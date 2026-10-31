@@ -98,7 +98,7 @@ def test_claude_status(store, tmp_path, monkeypatch):
 def test_settings_and_backups(store):
     from arete import setup_checks
     setup_checks.save_settings(wizard_done=False, other=1)
-    assert setup_checks.load_settings() == {"wizard_done": False, "other": 1}
+    assert setup_checks.load_settings() == {"wizard_done": False, "timezone": "Europe/London", "other": 1}
     path = setup_checks.backup_now()
     assert path.exists() and path.parent == store.DATA_DIR / "backups"
     assert setup_checks.list_backups() == [path]
@@ -251,3 +251,22 @@ def test_text_size_setting(store):
     at.segmented_control(key="set_text_size").set_value("Extra large").run()
     assert not at.exception and appearance.text_size() == "Extra large"
     assert any("html { font-size: 20px !important; }" in h.value for h in at.get("html"))
+
+
+def test_time_zone(store, monkeypatch):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    assert store.zone_name() == "Europe/London"                  # (the tests pin it)
+    store.save_settings(timezone="America/New_York")
+    assert store.local_today() == datetime.now(ZoneInfo("America/New_York")).date()
+    assert store.stamp().endswith(("-04:00", "-05:00"))
+    store.save_settings(timezone="Not/AZone")                    # nonsense: the computer's zone
+    monkeypatch.setattr(store, "computer_zone_name", lambda: "Asia/Tokyo")
+    assert store.zone_name() == "Asia/Tokyo"
+    store.save_settings(timezone=None)
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at.sidebar.radio[0].set_value("Settings").run()
+    assert not at.exception and at.toggle(key="region_tz_auto").value is True
+    at.toggle(key="region_tz_auto").set_value(False).run()
+    at.selectbox(key="region_tz").set_value("Australia/Sydney").run()
+    assert store.load_settings()["timezone"] == "Australia/Sydney" and not at.exception

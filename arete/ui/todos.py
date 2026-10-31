@@ -69,7 +69,7 @@ def _on_ops():
 def render_home():
     """Today's, this week's and this month's to-dos, side by side (stacked when narrow)."""
     store.roll_todos()
-    today = store.london_today()
+    today = store.local_today()
     sections = []
     for period in store.TODO_PERIODS:
         start = store.start_of_period(period, today)

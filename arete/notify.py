@@ -81,7 +81,7 @@ def check(sent, now=None):
     on, minutes = settings()
     if not on:
         return []
-    now = now or datetime.now(store.TZ).replace(tzinfo=None)
+    now = now or store.local_now()
     out = due(now, minutes, sent) + due_deadlines(now, sent)
     for key, title, body in out:
         sent.add(key)

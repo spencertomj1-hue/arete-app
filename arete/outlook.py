@@ -4,7 +4,7 @@ is ever written back to Outlook).
 
   fetch()   download the published .ics (its link is kept only in the macOS Keychain)
   parse()   expand recurring events (with their exceptions) in a window of 14 days back to
-            8 weeks ahead, convert to Europe/London, skip cancelled events
+            8 weeks ahead, convert to the user's time zone, skip cancelled events
   to_rows() fit events to the timetable grid: 07:00-01:00, after-midnight slots belong to the
             day before, start rounds down / end rounds up to 30 minutes
   sync()    all of the above, storing the rows in tt_outlook. The last good .ics is cached,
@@ -33,7 +33,6 @@ KEYCHAIN_SERVICE = "Arete"                 # the link is stored in the macOS Key
 KEYCHAIN_ACCOUNT = "outlook-ics-url"
 OUTLOOK_HOSTS = ("outlook.office365.com", "outlook.office.com", "outlook.live.com", "outlook.com")
 
-LONDON = ZoneInfo("Europe/London")
 DAYS_BACK = 14
 WEEKS_AHEAD = 8
 TIMEOUT = 10                               # seconds
@@ -132,10 +131,10 @@ def try_link(url, fetcher=None, today=None):
     events in the next 2 weeks and the next 3 of them. Raises SyncError.
     """
     data = (fetcher or fetch)(url)
-    now = datetime.now(LONDON)
+    now = datetime.now(store.tz())
     soon = []
     for ev in parse(data, today):
-        start = ev["start"] if not ev["all_day"] else datetime.combine(ev["start"], time(0), LONDON)
+        start = ev["start"] if not ev["all_day"] else datetime.combine(ev["start"], time(0), store.tz())
         if now - timedelta(hours=1) <= start <= now + timedelta(days=14):
             soon.append((start, ev))
     soon.sort(key=lambda p: p[0])
@@ -175,19 +174,19 @@ def fetch(url):
 # ---------------------------------------------------------------------------
 
 def _to_london(value, tzid=None):
-    """Aware datetime in Europe/London. Naive times use their TZID (Windows names mapped)."""
+    """Aware datetime in the user's time zone (store.tz()). Naive times use their TZID (Windows names mapped)."""
     if value.tzinfo is None:
         try:
-            zone = ZoneInfo(WINDOWS_TO_OLSON.get(tzid, tzid)) if tzid else LONDON
+            zone = ZoneInfo(WINDOWS_TO_OLSON.get(tzid, tzid)) if tzid else store.tz()
         except (ZoneInfoNotFoundError, ValueError):
-            zone = LONDON
+            zone = store.tz()
         value = value.replace(tzinfo=zone)
-    return value.astimezone(LONDON)
+    return value.astimezone(store.tz())
 
 
 def parse(ics_bytes, today=None):
     """Events in the sync window, as dicts: uid, title, location, all_day, start, end."""
-    today = today or date.today()
+    today = today or store.local_today()
     window = (today - timedelta(days=DAYS_BACK), today + timedelta(weeks=WEEKS_AHEAD))
     calendar = icalendar.Calendar.from_ical(ics_bytes)
 
@@ -242,8 +241,8 @@ def _grid_rows(ev):
     rows = []
     day = s.date() - timedelta(days=1)          # an event at 00:30 belongs to the day before
     while day <= e.date():
-        g0 = datetime.combine(day, GRID_START, LONDON)
-        g1 = datetime.combine(day + timedelta(days=1), GRID_END, LONDON)
+        g0 = datetime.combine(day, GRID_START, store.tz())
+        g1 = datetime.combine(day + timedelta(days=1), GRID_END, store.tz())
         a, b = max(s, g0), min(e, g1)            # clip to the grid
         if a < b:
             first = math.floor((a - g0) / SLOT)   # start rounds down

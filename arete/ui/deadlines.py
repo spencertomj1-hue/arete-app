@@ -25,7 +25,7 @@ def _tone(due, today):
 
 
 def render_home():
-    today = store.london_today()
+    today = store.local_today()
     head, link = st.columns([4, 1], vertical_alignment="center")
     head.markdown("**Deadlines**")
     link.button("See all", key="home_deadlines_all", type="tertiary", on_click=_go_to_goals)
@@ -97,7 +97,7 @@ def _row(d, today):
 
 
 def render_section():
-    today = store.london_today()
+    today = store.local_today()
     with st.container(border=True):
         rows = store.deadlines(include_done=True)
         open_ = [d for d in rows if not d["done"]]

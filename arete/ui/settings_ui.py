@@ -312,19 +312,45 @@ def appearance_section():
     st.markdown("The quick brown fox jumps over the lazy dog: this is how text looks at this size.")
 
 
+def region_section():
+    """Time zone (and, below, how dates, times and units are shown)."""
+    import zoneinfo
+    st.subheader("Time zone")
+    st.caption("Decides what \"today\" is, and the times of your Outlook events.")
+    chosen = store.load_settings().get("timezone")
+    computer = store.computer_zone_name()
+    own = st.toggle(f"Use my computer's time zone ({computer})", value=not chosen, key="region_tz_auto")
+    if own and chosen:
+        store.save_settings(timezone=None)
+        st.rerun()
+    if not own:
+        zones = sorted(z for z in zoneinfo.available_timezones() if "/" in z and not z.startswith(("Etc/", "SystemV/")))
+        current = chosen or computer
+        pick = st.selectbox("Time zone", zones, index=zones.index(current) if current in zones else None,
+                            placeholder="Type a city, e.g. New_York", key="region_tz")
+        if pick and pick != chosen:
+            store.save_settings(timezone=pick)
+            st.rerun()
+    now = store.local_now()
+    st.markdown(f"It's **{now:%A} {now.day} {now:%B}, {now:%H:%M}** in {store.zone_name().replace('_', ' ')}.")
+
+
 def page_settings():
     st.header("Settings", anchor=False)
     ai = store.ai_enabled()
-    names = [":material/palette: Appearance", ":material/calendar_month: Calendar", ":material/chat: Assistant",
+    names = [":material/palette: Appearance", ":material/public: Region", ":material/calendar_month: Calendar",
+             ":material/chat: Assistant",
              ":material/notifications: Reminders", ":material/database: Data", ":material/info: About"]
     if ai:
-        names.insert(3, ":material/mic: Voice")       # voice input is for the assistant
-    tabs = dict(zip(["look", "cal", "claude", "mic", "remind", "data", "about"] if ai else
-                    ["look", "cal", "claude", "remind", "data", "about"], st.tabs(names)))
-    look, cal, claude, mic, remind, data, about = (
-        tabs.get(k) for k in ("look", "cal", "claude", "mic", "remind", "data", "about"))
+        names.insert(4, ":material/mic: Voice")       # voice input is for the assistant
+    tabs = dict(zip(["look", "region", "cal", "claude", "mic", "remind", "data", "about"] if ai else
+                    ["look", "region", "cal", "claude", "remind", "data", "about"], st.tabs(names)))
+    look, region, cal, claude, mic, remind, data, about = (
+        tabs.get(k) for k in ("look", "region", "cal", "claude", "mic", "remind", "data", "about"))
     with look:
         appearance_section()
+    with region:
+        region_section()
     with cal:
         st.subheader("Outlook calendar", anchor=False)
         connected = calendar_status("set")
@@ -382,7 +408,7 @@ def _data_section():
     st.subheader("Export", anchor=False)
     st.write("Your daily log and habits as one CSV: one row per date, one column per habit.")
     csv = store.load_all_data().to_csv(index=False)
-    st.download_button("Download CSV", csv, file_name=f"arete_export_{date.today()}.csv",
+    st.download_button("Download CSV", csv, file_name=f"arete_export_{store.local_today()}.csv",
                        mime="text/csv", icon=":material/download:")
 
     st.subheader("Import", anchor=False)
@@ -405,7 +431,7 @@ def _data_section():
     entries = store.journal_entries()
     st.write(f"Your journal (the Daily Log's notes) as one text file, oldest first ({len(entries)} entr{'y' if len(entries) == 1 else 'ies'}).")
     text = "\n\n".join(f"# {e['date']}\n\n{e['text']}" for e in reversed(entries))
-    st.download_button("Download journal", text, file_name=f"arete_journal_{date.today()}.md",
+    st.download_button("Download journal", text, file_name=f"arete_journal_{store.local_today()}.md",
                        mime="text/markdown", icon=":material/download:", disabled=not entries)
 
     _csv_section(
@@ -464,7 +490,7 @@ def _csv_section(name, slug, load, save, required, columns):
     st.subheader(name, anchor=False)
     st.write(f"{name} export and import as their own CSV, one row per item.")
     st.download_button(f"Download {name.lower()} CSV", load().to_csv(index=False),
-                       file_name=f"arete_{slug}_{date.today()}.csv", mime="text/csv", icon=":material/download:")
+                       file_name=f"arete_{slug}_{store.local_today()}.csv", mime="text/csv", icon=":material/download:")
     st.write(f"To import, use the same columns: {columns} A row whose `id` already exists updates it.")
     uploaded = st.file_uploader(f"{name} CSV file", type="csv", key=f"{slug}_csv")
     mode = st.radio(f"{name} import mode", ["Merge (update matching ids)", f"Replace all existing {name.lower()}"],

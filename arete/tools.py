@@ -215,7 +215,7 @@ def set_habit_target(habit_name, times_per_week=None):
 
 
 def list_habits(today=None):
-    today = today or date.today()
+    today = today or store.local_today()
     lines = []
     for habit_id, name in store.get_habits():
         dates = store.get_habit_dates(habit_id)
@@ -465,8 +465,8 @@ def _days_between(first, last, weekdays_only):
 
 
 def _now():
-    """Now in Europe/London, without a timezone (tests replace this)."""
-    return datetime.now(store.TZ).replace(tzinfo=None)
+    """Now in the user's time zone, without a timezone attached (tests replace this)."""
+    return store.local_now()
 
 
 def _first_future_slot(day):
@@ -584,7 +584,7 @@ def _period(value, allowed=store.TODO_PERIODS):
 
 
 def _period_day(value):
-    return date.fromisoformat(_day(value)) if value else store.london_today()
+    return date.fromisoformat(_day(value)) if value else store.local_today()
 
 
 def todo_list_name(period, start):
@@ -1069,7 +1069,7 @@ def find_people(query=None):
 def log_interaction(person, note, date=None):
     """Note a time the user saw or spoke to someone, e.g. "Coffee; talked about her thesis"."""
     p = _find_person(person)
-    day = _day(date) if date else store.london_today().isoformat()
+    day = _day(date) if date else store.local_today().isoformat()
     try:
         store.add_interaction(p["id"], note, day)
     except ValueError as e:
@@ -1092,7 +1092,7 @@ def person_history(person, limit=20):
 
 def write_journal(text, date=None, replace=False, confirmed=False):
     """Add a paragraph to a day's notes / journal entry (today by default); replace=True rewrites the whole entry."""
-    day = _day(date) if date else store.london_today().isoformat()
+    day = _day(date) if date else store.local_today().isoformat()
     text = str(text or "").strip()
     if not text:
         raise ToolError("Nothing to write.")

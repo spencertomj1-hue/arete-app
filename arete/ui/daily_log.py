@@ -63,8 +63,8 @@ def _on_select():
 def _on_month():
     nav = st.session_state["log_calendar"]["nav"] or {}
     if nav.get("dir") == 0:
-        st.session_state["log_day"] = date.today()
-        st.session_state["log_month"] = date.today().replace(day=1)
+        st.session_state["log_day"] = store.local_today()
+        st.session_state["log_month"] = store.local_today().replace(day=1)
         return
     month = st.session_state["log_month"]
     # First day of the previous / next month.
@@ -77,7 +77,7 @@ PAGE = "Daily Log"      # sidebar label (also what Home's habits "Manage" switch
 
 def page_daily_log():
     st.header("Daily Log", anchor=False)
-    today = date.today()
+    today = store.local_today()
     selected = st.session_state.setdefault("log_day", today)
     month = st.session_state.setdefault("log_month", today.replace(day=1))
 
@@ -180,7 +180,7 @@ def _open_habits():
 
 def render_home_habits():
     """Home: today's habits to tick, each with the last 7 days and its current streak."""
-    today = date.today()
+    today = store.local_today()
     days = [today - timedelta(days=i) for i in range(6, -1, -1)]
     accent = st.get_option("theme.primaryColor") or "#ff4b4b"
     head, link = st.columns([4, 1], vertical_alignment="center")

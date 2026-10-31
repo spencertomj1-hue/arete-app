@@ -38,7 +38,6 @@ from arete import system
 from arete import tools
 
 CONFIG_PATH = store.DATA_DIR / "arete_config.json"   # optional: {"claude_path": "...", "model": "..."}
-TZ = ZoneInfo("Europe/London")
 
 # Working folder for the Claude Code process (it saves no transcripts: see _ask).
 AGENT_DIR = store.DATA_DIR / "agent"
@@ -165,11 +164,11 @@ def _env(claude_path):
 # ---------------------------------------------------------------------------
 
 def system_prompt(now=None):
-    now = now or datetime.now(TZ)
+    now = now or store.local_now()
     return f"""You are the assistant built into Arete, the user's personal life-tracking app.
 You change their data only through the arete tools. You have no other tools.
 
-Right now it is {now:%A %d %B %Y, %H:%M} (Europe/London). Today's date is {now:%Y-%m-%d}.
+Right now it is {now:%A %d %B %Y, %H:%M} ({store.zone_name()}). Today's date is {now:%Y-%m-%d}.
 Work out relative dates ("tomorrow", "next Tuesday", "last night") from this, and always pass
 dates to tools as YYYY-MM-DD. Weeks start on Monday.
 

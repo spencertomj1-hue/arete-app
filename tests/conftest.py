@@ -21,7 +21,7 @@ def store(tmp_path, monkeypatch):
     store_module = importlib.reload(store_module)
     store_module.init_db()
     # Most tests want the app itself, not the first-run wizard.
-    (data / "settings.json").write_text('{"wizard_done": true}')
+    (data / "settings.json").write_text('{"wizard_done": true, "timezone": "Europe/London"}')   # the tests' dates assume London
     yield store_module
 
 

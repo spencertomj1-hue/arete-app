@@ -118,7 +118,7 @@ Two different things:
 - **To-dos** are tick-off lists for a day, a week or a month, shown only on Home.
 - **Goals** are measurable targets for a month or a year, with progress bars, on the Goals page and on Home.
 
-**Periods (shared):** all period maths is in `store.py` (`start_of_period`, `shift_period`, `end_of_period`, `period_title`), on Europe/London dates (`london_today()`). Weeks run Monday to Sunday, like the timetable.
+**Periods (shared):** all period maths is in `store.py` (`start_of_period`, `shift_period`, `end_of_period`, `period_title`), on dates in the user's time zone (`local_today()`). Weeks run Monday to Sunday, like the timetable.
 
 **To-dos:**
 - **Repeats:** `roll_todos()` runs whenever Home or a to-do tool loads. Once per period (remembered in `todo_rollover`), each title whose latest earlier copy has repeat on gets an unticked copy, unless the title is already there. A copy the user deletes therefore stays deleted, and turning repeat off on the latest copy stops it.
@@ -151,7 +151,7 @@ Two different things:
 ## 6. Outlook import (`outlook.py`)
 
 - **Read only:** nothing is ever written to Outlook. The link is only in the Keychain. **Never log or display it.** `fetch()` replaces `requests`' exceptions (which contain the URL) with safe messages, and a test checks this.
-- **Parsing:** `icalendar` + `recurring_ical_events` expand recurrences and their exceptions over a window from 14 days back to 8 weeks ahead. Times are converted to Europe/London. Windows timezone names are resolved (with a `WINDOWS_TO_OLSON` fallback).
+- **Parsing:** `icalendar` + `recurring_ical_events` expand recurrences and their exceptions over a window from 14 days back to 8 weeks ahead. Times are converted to the user's time zone (`store.tz()`). Windows timezone names are resolved (with a `WINDOWS_TO_OLSON` fallback).
 - **Cancelled events are skipped:** `STATUS:CANCELLED`, and also titles starting "Canceled:"/"Cancelled:", because Outlook keeps meetings cancelled by someone else as CONFIRMED with that title.
 - **Fitting to the grid:** `to_rows` intersects each event with every timetable day, snapping start down and end up to 30 minutes. All-day events get one row per day.
 - **Descriptions:** `short_description` drops Teams/Zoom join boilerplate and cuts to about 300 characters.
@@ -177,7 +177,7 @@ Two different things:
 - **No chat on disk:** the CLI runs with `--no-session-persistence`. `chat.py` keeps the conversation in `st.session_state` and sends the last 12 messages as context (`_with_history`).
 - **Finding the CLI:** `find_claude()` checks `arete_config.json`, then `$ARETE_CLAUDE_PATH`, `which`, the common install paths and nvm. Finder-launched apps get a bare PATH, so `_env()` adds PATH, USER and HOME; without USER/HOME the CLI can't read its Keychain login.
 - **Async:** the SDK runs in a worker thread with its own event loop, so it never clashes with Streamlit's.
-- **System prompt:** rebuilt every message, with the current Europe/London date/time, the timetable rules, the categories and the confirm rules.
+- **System prompt:** rebuilt every message, with the current date/time in the user's time zone, the timetable rules, the categories and the confirm rules.
 - **Tools:**
   - `log_day`, `set_habit`, `add_habit`, `list_habits`
   - `add_block`, `update_block`, `delete_block`, `query_blocks`, `query_entries`, `get_stats`
@@ -209,6 +209,7 @@ Two different things:
 
 ## 9. Gotchas
 
+- **Time zone:** never use `date.today()` / `datetime.now()` for the user's day: use `store.local_today()` / `store.local_now()` / `store.stamp()`. The zone is settings.json "timezone" (Settings → Region) or the computer's (`tzlocal`). The tests pin Europe/London in conftest.
 - **Keyboard:** every page is checked by tabbing through it: each stop must show focus (Streamlit's controls draw their own; `appearance.apply_text_colours()` adds rings for the scrollable main area, links and `[tabindex]`; components have their own `:focus-visible`). Streamlit's "Skip to main content" link is the first stop. Headings use `anchor=False` (otherwise each adds an invisible "link to heading" stop). Dialogs close with Esc; the sidebar menu is one radio group (arrow keys).
 - **Contrast (WCAG AA):** text must be 4.5:1. Colours for each mode are in `.streamlit/config.toml` (`[theme.light]` / `[theme.dark]`: accent, red/orange/grey text). Components use `--muted` (mixed from the text colour, fine in both modes) rather than fixed greys; captions are overridden in `appearance.apply_text_colours()` (Streamlit fades them to 3.7:1). Don't fade text below `opacity: 0.72`. Check with axe-core's `color-contrast` rule in both modes after UI changes.
 

@@ -73,7 +73,7 @@ def test_goals_csv_round_trip(store):
     rows = pd.DataFrame({"title": ["Swim", "No target", "Bad period"], "period": ["Monthly", "monthly", "weekly"],
                          "target": [4, None, 3], "habit": ["Nope", None, None]})
     assert store.save_goals(rows) == 1                        # unknown habit -> updated by hand
-    assert [x["habit"] for x in store.goals_in("monthly", store.london_today()) if x["title"] == "Swim"] == [None]
+    assert [x["habit"] for x in store.goals_in("monthly", store.local_today()) if x["title"] == "Swim"] == [None]
 
 
 def test_old_goals_table_becomes_todos(tmp_path, monkeypatch):

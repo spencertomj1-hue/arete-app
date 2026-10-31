@@ -164,7 +164,7 @@ def auto_backup_if_due(today=None):
     on, keep = auto_backup_settings()
     if not on or not store.DB_PATH.exists():
         return None
-    today = (today or date.today()).isoformat()
+    today = (today or date.today()).isoformat()      # backups are named by the computer's clock
     if any((m := _AUTO.fullmatch(p.name)) and m.group(1) == today for p in list_backups()):
         return None
     made = backup_now()

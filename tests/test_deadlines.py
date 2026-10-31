@@ -29,7 +29,7 @@ def test_store_and_countdown(store):
 def test_tools(store, monkeypatch):
     from arete import tools
     tools = importlib.reload(tools)
-    monkeypatch.setattr(store, "london_today", lambda: date(2026, 10, 30))
+    monkeypatch.setattr(store, "local_today", lambda: date(2026, 10, 30))
     assert tools.add_deadline("Essay on Kant", "2026-11-06").text == \
         "Added deadline 'Essay on Kant' due Fri 6 Nov (in 7 days)."
     tools.add_deadline("Internship application", "2026-11-15")
@@ -55,7 +55,7 @@ def test_deadline_reminders(store):
 
 
 def test_pages(store):
-    today = store.london_today()
+    today = store.local_today()
     store.add_deadline("Essay", today + timedelta(days=3))
     at = AppTest.from_file(APP, default_timeout=60).run()
     assert not at.exception

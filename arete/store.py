@@ -281,6 +281,50 @@ def ai_enabled():
     return bool(load_settings().get("ai_enabled", True))
 
 
+# ---------------------------------------------------------------------------
+# Time zone: settings.json "timezone" (an IANA name like "America/New_York"),
+# else the computer's own. Every "now" and "today" in Arete goes through here.
+# ---------------------------------------------------------------------------
+
+def computer_zone_name():
+    """The computer's time zone, e.g. "Europe/London" (UTC if it can't be found)."""
+    try:
+        import tzlocal
+        return tzlocal.get_localzone_name() or "UTC"
+    except Exception:       # no tzlocal, or an odd system setup
+        return "UTC"
+
+
+def zone_name():
+    """The time zone Arete uses: the one chosen in Settings, else the computer's."""
+    chosen = load_settings().get("timezone")
+    if chosen:
+        try:
+            ZoneInfo(chosen)
+            return chosen
+        except (ValueError, KeyError, OSError):
+            pass
+    return computer_zone_name()
+
+
+def tz():
+    return ZoneInfo(zone_name())
+
+
+def local_now():
+    """Now, as a plain (naive) date and time in the user's time zone."""
+    return datetime.now(tz()).replace(tzinfo=None)
+
+
+def local_today():
+    return datetime.now(tz()).date()
+
+
+def stamp():
+    """A timestamp for created_at / done_at columns (with its UTC offset)."""
+    return datetime.now(tz()).isoformat(timespec="seconds")
+
+
 def save_settings(**changes):
     settings = {**load_settings(), **changes}
     settings_path().parent.mkdir(parents=True, exist_ok=True)
@@ -435,7 +479,7 @@ def add_deadline(title, due, notes=None):
     with db() as conn:
         conn.execute(f"INSERT INTO deadlines ({DEADLINE_COLS}) VALUES (?, ?, ?, ?, 0, NULL, ?)",
                      (did, title, _as_date(due).isoformat(), (notes or "").strip() or None,
-                      datetime.now(TZ).isoformat(timespec="seconds")))
+                      stamp()))
     return did
 
 
@@ -471,7 +515,7 @@ def update_deadline(did, title=KEEP, due=KEEP, notes=KEEP):
 def set_deadline_done(did, done):
     with db() as conn:
         conn.execute("UPDATE deadlines SET done = ?, done_at = ? WHERE id = ?",
-                      (int(bool(done)), datetime.now(TZ).isoformat(timespec="seconds") if done else None, did))
+                      (int(bool(done)), stamp() if done else None, did))
 
 
 def delete_deadline(did):
@@ -481,7 +525,7 @@ def delete_deadline(did):
 
 def countdown(due, today=None):
     """'Today', 'Tomorrow', 'in 5 days', 'Yesterday' or '3 days overdue'."""
-    n = (_as_date(due) - (today or london_today())).days
+    n = (_as_date(due) - (today or local_today())).days
     if n == 0:
         return "Today"
     if n == 1:
@@ -545,7 +589,7 @@ def week_ticks(done_dates, day):
 def weekly_streaks(done_dates, per_week, today=None):
     """(current, best) runs of weeks that hit the target. This week counts once it's hit;
     until then the streak runs to last week, so it doesn't break before the week is over."""
-    today = today or date.today()
+    today = today or local_today()
     this_monday = today - timedelta(days=today.weekday())
     mondays = sorted({d - timedelta(days=d.weekday()) for d in map(date.fromisoformat, done_dates)})
     hit = {m for m in mondays if week_ticks(done_dates, m) >= per_week}
@@ -563,7 +607,7 @@ def weekly_streaks(done_dates, per_week, today=None):
 
 def habit_progress(habit_id, done_dates, today=None):
     """One line about a habit's progress: '3-day streak · best 9' or '2 of 3 this week · 4-week streak'."""
-    today = today or date.today()
+    today = today or local_today()
     per_week = habit_targets().get(habit_id)
     if per_week:
         current, best = weekly_streaks(done_dates, per_week, today)
@@ -621,7 +665,7 @@ def streaks(done_dates, today=None):
     # Current streak: count back from today. If today isn't ticked yet,
     # start from yesterday so the streak doesn't "break" before the day is over.
     current = 0
-    day = today or date.today()
+    day = today or local_today()
     if day.isoformat() not in done_dates:
         day -= timedelta(days=1)
     while day.isoformat() in done_dates:
@@ -1087,16 +1131,11 @@ def outlook_overlaps(day, s, e):
 # Each to-do (and each goal, below) belongs to one period, identified by its
 # first day (period_start); the period maths here is shared by both.
 # Repeating to-dos get a fresh unticked copy when a new period starts (roll_todos).
-# "Today" is always the Europe/London date.
+# "Today" is the date in the user's time zone (local_today, see "Time zone" above).
 # ---------------------------------------------------------------------------
 
 TODO_PERIODS = ("daily", "weekly", "monthly")
 TODO_COLS = 'id, title, notes, period, period_start, done, done_at, "repeat", ord, created_at'
-TZ = ZoneInfo("Europe/London")
-
-
-def london_today():
-    return datetime.now(TZ).date()
 
 
 def _as_date(day):
@@ -1150,7 +1189,7 @@ def period_title(period, start, today=None):
     A period's name relative to today: "Today", "Fri 30 Oct", "This week: 26 Oct to 1 Nov",
     "Last week: ...", "19 to 25 Oct", "November 2026", "2026".
     """
-    today = today or london_today()
+    today = today or local_today()
     start = start_of_period(period, start)
     if period == "daily":
         named = {0: "Today", -1: "Yesterday", 1: "Tomorrow"}.get((start - today).days)
@@ -1198,7 +1237,7 @@ def _insert_todo(conn, title, period, start, notes=None, repeat=False, todo_id=N
     conn.execute(
         f"INSERT OR IGNORE INTO todos ({TODO_COLS}) VALUES (?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)",
         (todo_id, title, notes, period, start, int(bool(repeat)), _next_ord(conn, period, start),
-         datetime.now(TZ).isoformat(timespec="seconds")),
+         stamp()),
     )
     return todo_id
 
@@ -1219,7 +1258,7 @@ def set_todo_done(todo_id, done):
     with db() as conn:
         conn.execute(
             "UPDATE todos SET done = ?, done_at = CASE WHEN ? THEN COALESCE(done_at, ?) END WHERE id = ?",
-            (int(bool(done)), int(bool(done)), datetime.now(TZ).isoformat(timespec="seconds"), todo_id),
+            (int(bool(done)), int(bool(done)), stamp(), todo_id),
         )
 
 
@@ -1246,7 +1285,7 @@ def move_target(todo, period, today=None):
     Where a to-do lands when moved to another kind of period: the period containing
     today if its current period includes today, otherwise its own first day.
     """
-    today = today or london_today()
+    today = today or local_today()
     start = date.fromisoformat(todo["period_start"])
     anchor = today if start <= today <= end_of_period(todo["period"], start) else start
     return start_of_period(period, anchor)
@@ -1288,7 +1327,7 @@ def roll_todos(today=None):
     period has repeat on. Titles already in the current period are never doubled.
     Returns how many copies were made.
     """
-    today = today or london_today()
+    today = today or local_today()
     made = 0
     with db() as conn:
         for period in TODO_PERIODS:
@@ -1359,7 +1398,7 @@ def save_todos(df, replace=False):
             if not title or period not in TODO_PERIODS:
                 continue
             day = _clean(row.get("period_start"), str)
-            start = start_of_period(period, pd.to_datetime(day).date() if day else london_today()).isoformat()
+            start = start_of_period(period, pd.to_datetime(day).date() if day else local_today()).isoformat()
             done = _is_ticked(row.get("done"))
             ord_ = _clean(row.get("ord"), int)
             conn.execute(
@@ -1368,7 +1407,7 @@ def save_todos(df, replace=False):
                  period, start, int(done), _clean(row.get("done_at"), str) if done else None,
                  int(_is_ticked(row.get("repeat"))),
                  _next_ord(conn, period, start) if ord_ is None else ord_,
-                 _clean(row.get("created_at"), str) or datetime.now(TZ).isoformat(timespec="seconds")),
+                 _clean(row.get("created_at"), str) or stamp()),
             )
             count += 1
     return count
@@ -1445,7 +1484,7 @@ def add_goal(title, period, day, target, unit=None, habit_id=None, goal_id=None)
             f"INSERT OR IGNORE INTO goals ({GOAL_COLS}) VALUES (?, ?, ?, ?, ?, ?, 0, ?, "
             "(SELECT COALESCE(MAX(ord) + 1, 0) FROM goals WHERE period = ? AND period_start = ?), ?)",
             (goal_id, title, period, start, _check_target(target), (unit or "").strip() or None, habit_id,
-             period, start, datetime.now(TZ).isoformat(timespec="seconds")),
+             period, start, stamp()),
         )
     return get_goal(goal_id)
 
@@ -1519,7 +1558,7 @@ def save_goals(df, replace=False):
             if not title or period not in GOAL_PERIODS or not target or target <= 0:
                 continue
             day = _clean(row.get("period_start"), str)
-            start = start_of_period(period, pd.to_datetime(day).date() if day else london_today()).isoformat()
+            start = start_of_period(period, pd.to_datetime(day).date() if day else local_today()).isoformat()
             habit = _clean(row.get("habit"), str)
             ord_ = _clean(row.get("ord"), int)
             conn.execute(
@@ -1527,7 +1566,7 @@ def save_goals(df, replace=False):
                 (_clean(row.get("id"), str) or uuid.uuid4().hex, title.strip(), period, start, target,
                  _clean(row.get("unit"), str), max(0.0, _clean(row.get("progress"), float) or 0.0),
                  habits.get(habit.strip().lower()) if habit else None, count if ord_ is None else ord_,
-                 _clean(row.get("created_at"), str) or datetime.now(TZ).isoformat(timespec="seconds")),
+                 _clean(row.get("created_at"), str) or stamp()),
             )
             count += 1
     return count
@@ -1677,7 +1716,7 @@ def add_person(name, description=None, works_for=None, group_id=None, person_id=
     with db() as conn:
         conn.execute(f"INSERT INTO net_people ({', '.join(PERSON_COLS)}) VALUES (?, ?, ?, ?, ?, ?)",
                      (person_id, fields["name"], fields.get("description"), fields.get("works_for"), group_id,
-                      datetime.now(TZ).isoformat(timespec="seconds")))
+                      stamp()))
     return get_person(person_id)
 
 
@@ -1736,7 +1775,7 @@ def add_interaction(person_id, note, day):
     iid = uuid.uuid4().hex
     with db() as conn:
         conn.execute("INSERT INTO net_interactions VALUES (?, ?, ?, ?, ?)",
-                     (iid, person_id, _as_date(day).isoformat(), note, datetime.now(TZ).isoformat(timespec="seconds")))
+                     (iid, person_id, _as_date(day).isoformat(), note, stamp()))
     return iid
 
 
@@ -1774,7 +1813,7 @@ def connections_of(person_id):
 
 def period_start(days, today=None):
     """First day of a period of `days` days ending today; None = since the first record."""
-    today = today or date.today()
+    today = today or local_today()
     if days:
         return today - timedelta(days=days - 1)
     with db() as conn:
@@ -1790,7 +1829,7 @@ def get_stats(days=None, today=None):
     Summary for the last `days` days (None = all time): averages, habit
     completion %, and timetable hours per category for plan and actual.
     """
-    today = today or date.today()
+    today = today or local_today()
     start = period_start(days, today)
     first, last = start.isoformat(), today.isoformat()
     num_days = (today - start).days + 1

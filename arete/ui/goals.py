@@ -40,7 +40,7 @@ def _shift(period, n):
     """‹ / › / back to the current month or year."""
     key = _start_key(period)
     if n == 0:
-        st.session_state[key] = store.start_of_period(period, store.london_today())
+        st.session_state[key] = store.start_of_period(period, store.local_today())
     else:
         st.session_state[key] = store.shift_period(period, st.session_state[key], n)
 
@@ -155,7 +155,7 @@ def _section(period, today):
 def render_page():
     st.header("Goals", anchor=False)
     st.caption("Measurable targets for the month or year, and deadlines. Day-to-day to-dos live on Home.")
-    today = store.london_today()
+    today = store.local_today()
     for col, period in zip(st.columns(2, gap="medium"), store.GOAL_PERIODS):
         with col:
             _section(period, today)
@@ -187,7 +187,7 @@ CHECK = ('<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><pa
 
 
 def render_home():
-    today = store.london_today()
+    today = store.local_today()
     accent = _accent()
     rows = []
     for period in store.GOAL_PERIODS:

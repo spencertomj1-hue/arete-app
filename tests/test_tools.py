@@ -205,7 +205,7 @@ def test_edit_category_and_activity_default(tools, store):
 @pytest.fixture
 def friday(store, monkeypatch):
     """Pin "today" (Europe/London) to Friday 30 Oct 2026."""
-    monkeypatch.setattr(store, "london_today", lambda: date(2026, 10, 30))
+    monkeypatch.setattr(store, "local_today", lambda: date(2026, 10, 30))
 
 
 def test_add_todo_to_this_week(tools, store, friday):

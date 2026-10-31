@@ -69,7 +69,7 @@ def test_old_journal_table_is_folded_into_notes(store):
 
 
 def test_daily_log_journal(store):
-    today = store.london_today()
+    today = store.local_today()
     store.save_journal(today, "Wrote some code.")
     store.save_journal("2026-01-02", "New year, new me")
     at = AppTest.from_file(APP, default_timeout=60).run()

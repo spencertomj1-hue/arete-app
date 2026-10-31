@@ -20,7 +20,7 @@ def open_page(at, name):
 
 
 def test_home_shows_todos_and_goals(store):
-    today = store.london_today()
+    today = store.local_today()
     for i in range(9):                                       # more than a card shows at first
         store.add_todo(f"Task {i}", "daily", today)
     store.add_goal("Gym", "monthly", today, 12, "sessions")
@@ -38,7 +38,7 @@ def test_see_all_opens_goals_page(store):
 
 
 def test_goals_page_plus_minus_and_navigation(store):
-    today = store.london_today()
+    today = store.local_today()
     g = store.add_goal("Read", "monthly", today, 4, "books")
     store.add_habit("Gym")
     store.add_goal("Gym", "yearly", today, 100, habit_id=store.find_habit("gym")[0])
