@@ -178,8 +178,12 @@ def backup_now():
     """Copy the database into the backups folder (SQLite's safe online backup). Returns the file."""
     backups_dir().mkdir(parents=True, exist_ok=True)
     target = backups_dir() / f"life-{datetime.now():%Y-%m-%d-%H%M%S}.db"
-    with sqlite3.connect(store.DB_PATH) as src, sqlite3.connect(target) as dst:
+    src, dst = sqlite3.connect(store.DB_PATH), sqlite3.connect(target)
+    try:
         src.backup(dst)
+    finally:                     # close both (a `with` block doesn't): Windows can't delete or move open files
+        dst.close()
+        src.close()
     return target
 
 
