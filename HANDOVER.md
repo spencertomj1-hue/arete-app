@@ -47,6 +47,7 @@ arete/                         The app's code, as a package (imported as `from a
   setup_checks.py              Logic behind the wizard/Settings: Claude status, mic test, backups, Finder
   ui/                          One module per page or section (imported as `from arete.ui import goals`, ...)
     timetable.py               Timetable page and the week/day grid's Python side
+    timetable_tools.py         Buttons above the grid: Add block, Fit time, Categories (dialogs calling the same tools.py functions as Claude)
     daily_log.py               Daily Log page (month calendar, day card, the day's habits, entry form with the journal box, past entries) and Home's habits
     todos.py                   Home's to-do cards
     goals.py                   Goals page and Home's goal bars (native Streamlit widgets + an HTML bar)
@@ -93,7 +94,7 @@ Notes on the schema:
 - **New installs** are seeded with generic categories (groups "Life" and "Work") and activity defaults, in `DEFAULT_CATEGORIES` / `DEFAULT_LABEL_MAP`. Groups are read from the data (`store.groups()`), so a user's own groups work too.
 - **`end` is an SQL keyword** and must be quoted.
 - **Migrations:** columns added later are added by `_add_column` in `init_db`, so existing databases keep working. `_goals_became_todos` handles databases from before the to-do / goal split: their `goals` table (which held to-dos) is backed up to `backups/life-…-before-todos.db`, renamed to `todos` (with `goal_rollover` → `todo_rollover`), and its yearly to-dos dropped.
-- **`settings.json`** holds `wizard_done`, `outlook_category`, `reminders` (default on) and `reminder_minutes` (default 5). Use `store.load_settings` / `save_settings`.
+- **`settings.json`** holds `ai_enabled` (the optional assistant; `store.ai_enabled()`, missing = on for older installs, the wizard writes it and defaults it off), `wizard_done`, `outlook_category`, `reminders` (default on) and `reminder_minutes` (default 5). Use `store.load_settings` / `save_settings`.
 
 ## 5. Timetable
 
@@ -164,6 +165,8 @@ Two different things:
 
 ## 7. Claude chat (`assistant.py`, `tools.py`, `chat.py`)
 
+- **Optional:** everything must work by hand. With `ai_enabled` off there's no chat bar, no Home ask box, no Voice tab, and hints don't mention Arete/Claude. Anything Claude can change needs a UI too: when adding a tool, add (or reuse) a button/dialog, ideally calling the same `tools.py` function so rules and Confirm previews match (see `ui/timetable_tools.py`).
+
 - **The agent:** `claude_agent_sdk.query` drives the `claude` CLI: the user's installed Claude Code if `find_claude()` finds one, otherwise the copy bundled inside the SDK (`bundled_claude()`).
 - **Signing in:** an Anthropic API key (pasted in the wizard/Settings, checked with Anthropic's free `GET /v1/models`, stored with `keyring` as service `Arete`, account `anthropic-api-key`; or `$ANTHROPIC_API_KEY`) is passed to the CLI as `ANTHROPIC_API_KEY`, which it prefers over a login. Otherwise the user's Claude Code login is used. `setup_checks.claude_status()` reports which.
 - **Isolation:**
@@ -176,7 +179,7 @@ Two different things:
 - **Tools:**
   - `log_day`, `set_habit`, `add_habit`, `list_habits`
   - `add_block`, `update_block`, `delete_block`, `query_blocks`, `query_entries`, `get_stats`
-  - `plan_time`: fits N hours of an activity into the Plan's free gaps (`store.free_runs`: around the user's blocks and visible Outlook events) between two dates, within earliest/latest, in sittings of up to `max_block_hours`, spread over evenly spaced days with a 30-minute break between sittings on the same day. Always a preview (Confirm paints them).
+  - `plan_time`: fits N hours of an activity into the Plan's free gaps (`store.free_runs`: around the user's blocks and visible Outlook events) between two dates, within earliest/latest, in sittings of up to `max_block_hours`, spread over evenly spaced days with a 30-minute break between sittings on the same day. Always a preview (Confirm paints them). Never plans in the past (`_first_future_slot`, using `_now()`, which tests pin).
   - `list_categories`, `edit_category`, `set_activity_default`, `set_outlook_category`
   - `log_day` also takes `water` (litres, the day's total; changing it needs no confirmation since it's a running total).
   - Journal: `write_journal`, `read_journal`. Network interactions: `log_interaction`, `person_history`.

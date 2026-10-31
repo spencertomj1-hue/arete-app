@@ -1,7 +1,7 @@
 """The assistant's tools (tools.py), run against a throwaway database."""
 
 import importlib
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
@@ -9,7 +9,9 @@ import pytest
 @pytest.fixture
 def tools(store):
     from arete import tools as tools_module
-    return importlib.reload(tools_module)   # picks up the reloaded store
+    tools_module = importlib.reload(tools_module)   # picks up the reloaded store
+    tools_module._now = lambda: datetime(2026, 10, 1, 8, 0)   # plan_time never plans in the past
+    return tools_module
 
 
 DAY = "2026-10-29"
@@ -454,3 +456,11 @@ def test_log_water(tools, store):
     assert "water 2 L" in tools.query_entries(DAY, DAY).text
     with pytest.raises(tools.ToolError):
         tools.log_day(DAY, water=40)
+
+
+def test_plan_time_skips_the_past(tools, store):
+    tools._now = lambda: datetime(2026, 10, 27, 12, 10)           # Tuesday, 12:10
+    r = tools.plan_time("Revision", 4, "2026-10-26", "2026-10-28", earliest="09:00", latest="18:00")
+    assert r.pending.summary.endswith("Tue 27 Oct 12:30–14:30; Wed 28 Oct 09:00–11:00")
+    with pytest.raises(tools.ToolError, match="already over"):
+        tools.plan_time("Revision", 2, "2026-10-20", "2026-10-26")

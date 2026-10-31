@@ -4,6 +4,9 @@ First-run setup wizard and the Settings page.
 The wizard shows once (settings.json "wizard_done") and can be reopened from
 Settings → About. Its Claude, Outlook and microphone steps are the same
 sections the Settings page uses, so both stay in sync.
+
+The Claude assistant is optional (settings.json "ai_enabled"): everything in
+Arete works by hand, and switching it on adds the chat box and voice input.
 """
 
 from datetime import date
@@ -17,7 +20,7 @@ from arete import setup_checks
 from arete import store
 from arete import system
 
-STEPS = [("Welcome", ":material/waving_hand:"), ("Claude", ":material/chat:"),
+STEPS = [("Welcome", ":material/waving_hand:"), ("Assistant", ":material/chat:"),
          ("Calendar", ":material/calendar_month:"), ("Microphone", ":material/mic:"), ("Done", ":material/check_circle:")]
 
 
@@ -178,15 +181,36 @@ def mic_section(prefix):
 # First-run wizard
 # ---------------------------------------------------------------------------
 
+def ai_switch(prefix):
+    """The on/off switch for the optional Claude assistant; True if it's on."""
+    on = store.ai_enabled() if "ai_enabled" in store.load_settings() else prefix != "wiz"
+    new = st.toggle("Use the Claude assistant", value=on, key=f"{prefix}_ai_on",
+                    help="Adds a chat box (and voice input) where you can ask Claude to make changes for you. "
+                         "Everything also works without it.")
+    if new != store.load_settings().get("ai_enabled"):
+        store.save_settings(ai_enabled=new)
+    return new
+
+
+AI_PITCH = ("Arete works fully by hand. Optionally, switch on the **Claude assistant** to get a chat box "
+            "where you type (or say) things like *\"I went to the gym 6 till 7\"*, *\"fit 6 hours of revision "
+            "into next week\"* or *\"had coffee with Sam\"*, and Claude makes the changes for you. "
+            "It needs an Anthropic API key or a Claude subscription, and the messages you send go to Anthropic.")
+
+
 def needs_wizard():
     return st.session_state.get("wizard_open") or not setup_checks.load_settings().get("wizard_done")
 
 
 def _go(step):
+    if step == 3 and not store.ai_enabled():          # the microphone is only for the assistant
+        step = 4 if st.session_state.get("wizard_step", 0) < 3 else 2
     st.session_state["wizard_step"] = step
 
 
 def _finish():
+    if "ai_enabled" not in setup_checks.load_settings():
+        setup_checks.save_settings(ai_enabled=False)  # skipped the question: the assistant stays off
     setup_checks.save_settings(wizard_done=True)
     st.session_state["wizard_open"] = False
     st.session_state["wizard_step"] = 0
@@ -206,15 +230,18 @@ def wizard():
             st.markdown(
                 "Arete keeps track of your days:\n\n"
                 "- :material/calendar_view_week: a **timetable** of what you planned and what you actually did\n"
-                "- :material/mood: a **daily log** of mood, sleep and energy, and your **habits**\n"
-                "- :material/chat: a **chat box** where you can ask Claude to update it all for you\n\n"
-                f":material/lock: **Your data stays on your {system.COMPUTER}.** Nothing is uploaded, except the messages you "
-                "send to Claude.\n\nThis takes about two minutes. You can skip anything and set it up later "
-                "in **Settings**."
+                "- :material/mood: a **daily log** of mood, sleep, energy and water, a journal, and your **habits**\n"
+                "- :material/checklist: **to-dos** and **goals**, and a map of the **people** you know\n"
+                "- :material/chat: optionally, a **Claude assistant** that can update it all for you\n\n"
+                f":material/lock: **Your data stays on your {system.COMPUTER}.** Nothing is uploaded (unless you switch on "
+                "the assistant, which sends your messages to Claude).\n\nThis takes about two minutes. You can skip "
+                "anything and set it up later in **Settings**."
             )
         elif step == 1:
-            st.header(f"{icon} Claude")
-            claude_section("wiz")
+            st.header(f"{icon} Claude assistant (optional)")
+            st.markdown(AI_PITCH)
+            if ai_switch("wiz"):
+                claude_section("wiz")
         elif step == 2:
             st.header(f"{icon} Outlook calendar (optional)")
             st.markdown("Show your Outlook events (classes, meetings) in the timetable. Arete only reads them.")
@@ -225,8 +252,10 @@ def wizard():
             mic_section("wiz")
         else:
             st.title("You're all set")
-            st.markdown("Arete opens on **Home**: today's agenda and timetable, and the box to ask Claude. "
-                        "Everything from this setup is in **Settings** if you want to change it.")
+            st.markdown("Arete opens on **Home**: today's agenda and timetable, your to-dos, habits and goals"
+                        + (", and the box to ask Claude" if store.ai_enabled() else "") + ". "
+                        "Everything from this setup is in **Settings** if you want to change it"
+                        + ("" if store.ai_enabled() else ", including switching on the Claude assistant") + ".")
 
         st.divider()
         back, skip, nxt = st.columns([1, 1, 1])
@@ -267,10 +296,14 @@ def reminders_section():
 
 def page_settings():
     st.header("Settings")
-    cal, claude, mic, remind, data, about = st.tabs([
-        ":material/calendar_month: Calendar", ":material/chat: Claude", ":material/mic: Voice",
-        ":material/notifications: Reminders", ":material/database: Data", ":material/info: About",
-    ])
+    ai = store.ai_enabled()
+    names = [":material/calendar_month: Calendar", ":material/chat: Assistant",
+             ":material/notifications: Reminders", ":material/database: Data", ":material/info: About"]
+    if ai:
+        names.insert(2, ":material/mic: Voice")       # voice input is for the assistant
+    tabs = dict(zip(["cal", "claude", "mic", "remind", "data", "about"] if ai else
+                    ["cal", "claude", "remind", "data", "about"], st.tabs(names)))
+    cal, claude, mic, remind, data, about = (tabs.get(k) for k in ("cal", "claude", "mic", "remind", "data", "about"))
     with cal:
         st.subheader("Outlook calendar")
         connected = calendar_status("set")
@@ -280,11 +313,16 @@ def page_settings():
         else:
             outlook_guide("set")
     with claude:
-        st.subheader("Claude")
-        claude_section("set")
-    with mic:
-        st.subheader("Voice input")
-        mic_section("set")
+        st.subheader("Claude assistant")
+        st.markdown(AI_PITCH)
+        if ai_switch("set") != ai:
+            st.rerun()                                   # show or hide the chat box straight away
+        if ai:
+            claude_section("set")
+    if mic:
+        with mic:
+            st.subheader("Voice input")
+            mic_section("set")
     with remind:
         st.subheader("Reminders")
         reminders_section()
@@ -293,7 +331,8 @@ def page_settings():
     with about:
         st.subheader("About Arete")
         st.markdown(
-            "A personal life tracker: timetable, daily log, habits, stats and a Claude chat box. "
+            "A personal life tracker: timetable, daily log and journal, habits, to-dos, goals, your network, "
+            "stats, and an optional Claude assistant. "
             f"Built with Streamlit and SQLite; runs entirely on your {system.COMPUTER}.\n\n"
             "Open source under the **MIT licence**."
         )

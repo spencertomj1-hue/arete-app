@@ -68,8 +68,8 @@ class Web {
       <div class="nw-stage">
         <svg class="nw-svg" role="group" aria-label="Your network: Tab to each person or group, Enter for details"><g class="nw-world"><g class="nw-edges"></g><g class="nw-nodes"></g></g></svg>
         <div class="nw-empty" hidden>
-          <b>No one here yet.</b><br>Tell Arete about someone, e.g.
-          <i>"Add Sam, a friend from uni who works at a bank, and Alex, who knows Sam from football."</i>
+          <b>No one here yet.</b><br>Click <b>Add someone</b> above to start<span class="nw-empty-ai">, or tell Arete, e.g.
+          <i>"Add Sam, a friend from uni who works at a bank, and Alex, who knows Sam from football."</i></span>
         </div>
         <div class="nw-card" hidden role="region" aria-live="polite" aria-label="Details"></div>
         <div class="nw-zoom">
@@ -190,6 +190,7 @@ class Web {
 
   draw() {
     this.empty.hidden = this.data.people.length > 0;
+    this.empty.querySelector(".nw-empty-ai").hidden = !this.data.ai;
     const tree = [...this.parent.entries()].map(([child, up]) => ({ a: up, b: child, kind: "tree" }));
     const links = this.data.links
       .filter((l) => this.people.has(l.a) && this.people.has(l.b))

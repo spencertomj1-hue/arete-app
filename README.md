@@ -54,8 +54,9 @@ It runs entirely on your computer (Mac or Windows) as a normal app. It's built w
 
 **Weekly timetable.**
 - **Layout:** a calendar-style week. Each day has a **Plan** column (what you intended) and an **Actual** column (what really happened), in 30-minute slots from 07:00 to 01:00. Anything after midnight counts as the previous day.
-- **Editing:** drag down a column to add a block, or click a block to see its details, edit it or delete it.
-- **Categories:** colour-coded, with groups "Life" and "Work" to start with. Activities pick their category automatically (for example "Lunch" → Meals). You can change categories and colours by asking Claude.
+- **Editing:** drag down a column to add a block, or click a block to see its details, edit it or delete it. **Add block** does the same with a form (and the keyboard).
+- **Categories:** colour-coded, with groups "Life" and "Work" to start with. Activities pick their category automatically (for example "Lunch" → Meals). **Categories** (above the grid) adds, renames and recolours them, sets those activity defaults, and picks Outlook events' colour.
+- **Fit time:** say what (e.g. Revision), how many hours and which days; Arete finds free gaps around your blocks and Outlook events, spreads the sittings out and shows you the times before adding them.
 - **Moving around:** use ‹ Today › or a date picker, or swipe sideways on the trackpad.
 
 **Daily Log.** A month calendar showing each day's mood, sleep, energy and litres of water. Click a day to read its notes, tick that day's habits (with current and best streaks), and save its entry. Habits are added and removed here too.
@@ -72,7 +73,7 @@ It runs entirely on your computer (Mac or Windows) as a normal app. It's built w
 
 **Stats.** Charts of mood, energy, sleep and water, plus habit completion rates.
 
-**Claude chat.** Type or speak what you want changed, for example:
+**Claude assistant (optional).** Everything above works by hand. If you like, switch on the assistant (during setup, or in Settings → Assistant) for a chat box where you type or speak what you want changed, for example:
 > "I went to the gym from 6 to 7 tonight"
 > "Plan a lecture 9 till 11 tomorrow"
 > "Fit 6 hours of revision into next week around my lectures"
@@ -202,7 +203,7 @@ Arete checks the link, shows how many events it found, and stores the link in yo
 
 ## Setting up the Claude chat
 
-The chat uses **your own** Claude access. Arete has no account or key of its own. Pick one:
+The assistant is optional and off unless you switch it on (setup, or Settings → Assistant). It uses **your own** Claude access. Arete has no account or key of its own. Pick one:
 
 - **Claude Code (recommended):**
   1. Install it: `curl -fsSL https://claude.ai/install.sh | bash`

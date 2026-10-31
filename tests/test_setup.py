@@ -117,7 +117,9 @@ def test_wizard_shows_on_a_fresh_data_folder_and_finishes(store, monkeypatch):
     assert at.title[0].value == "Welcome to Arete"
     assert not at.sidebar.radio                                  # no app yet
 
-    at.button(key="wiz_next").click().run()                      # -> Claude: an API key, by default
+    at.button(key="wiz_next").click().run()                      # -> the assistant: optional, off to start with
+    assert at.toggle(key="wiz_ai_on").value is False and not at.text_input
+    at.toggle(key="wiz_ai_on").set_value(True).run()             # on: how to connect Claude (an API key by default)
     assert at.text_input[0].label == "Anthropic API key"
     at.radio(key="wiz_claude_way").set_value("Use my Claude subscription (Claude Code)").run()
     assert any(setup_checks.INSTALL_CMD in c.value for c in at.code)
@@ -175,3 +177,27 @@ def test_check_api_key_messages(monkeypatch):
         monkeypatch.setattr(assistant.requests, "get", lambda *a, code=code, **k: Reply(code))
         result = assistant.check_api_key("sk-ant-x")
         assert result[0] is ok and words in result[1] and "sk-ant-x" not in result[1]
+
+
+def test_wizard_without_the_assistant(store):
+    """Leaving the assistant off: no microphone step, and no chat anywhere in the app."""
+    from arete import setup_checks
+    os.remove(store.DATA_DIR / "settings.json")
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at.button(key="wiz_next").click().run()                      # -> the assistant (left off)
+    at.button(key="wiz_next").click().run()                      # -> Calendar
+    at.button(key="wiz_next").click().run()                      # -> straight to Done (no microphone)
+    assert at.title[0].value == "You're all set"
+    at.button(key="wiz_back").click().run()                      # Back skips it too
+    assert any("Publish a calendar" in m.value for m in at.markdown)
+    at.button(key="wiz_next").click().run()
+    at.button(key="wiz_finish").click().run()
+    assert setup_checks.load_settings()["ai_enabled"] is False
+    assert not at.exception and at.sidebar.radio[0].value == "Home"
+    assert not [t for t in at.text_area if "Arete" in (t.placeholder or "")]   # no ask box
+    for page in at.sidebar.radio[0].options:
+        at.sidebar.radio[0].set_value(page).run()
+        assert not at.exception, page
+    at.sidebar.radio[0].set_value("Settings").run()
+    at.toggle(key="set_ai_on").set_value(True).run()             # switched on later in Settings
+    assert setup_checks.load_settings()["ai_enabled"] is True and not at.exception

@@ -310,7 +310,7 @@ class Timetable {
         </div>
       </div>
       <div class="tt-hint">Drag down a column to add · click a block for details${this.data.single ? "" : " · swipe sideways to change week"}</div>
-      <div class="tt-a11y" role="region" aria-label="Timetable blocks (press Enter on one for details; to add blocks with the keyboard or your voice, ask Arete in the chat)"></div>`;
+      <div class="tt-a11y" role="region" aria-label="Timetable blocks (press Enter on one for details; to add a block with the keyboard, use the Add block button above the timetable)"></div>`;
 
     // Blocks are positioned from the cells, so redo them when the size changes.
     this.blocksEl = this.root.querySelector(".tt-blocks");

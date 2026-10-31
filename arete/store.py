@@ -263,6 +263,12 @@ def load_settings():
         return {}
 
 
+def ai_enabled():
+    """Is the optional Claude assistant switched on? (Off on new installs unless chosen in setup;
+    on for installs from before the switch existed.)"""
+    return bool(load_settings().get("ai_enabled", True))
+
+
 def save_settings(**changes):
     settings = {**load_settings(), **changes}
     settings_path().parent.mkdir(parents=True, exist_ok=True)
@@ -590,6 +596,12 @@ def set_label_default(label, category_id):
     with db() as conn:
         conn.execute("DELETE FROM tt_label_map WHERE lower(label) = lower(?)", (label,))
         conn.execute("INSERT INTO tt_label_map VALUES (?, ?)", (label.strip(), category_id))
+
+
+def remove_label_default(label):
+    """Forget an activity label's default category."""
+    with db() as conn:
+        conn.execute("DELETE FROM tt_label_map WHERE lower(label) = lower(?)", (label,))
 
 
 def resolve_category(label=None, category=None):

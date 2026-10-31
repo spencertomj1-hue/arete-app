@@ -84,7 +84,8 @@ def page_home():
         _agenda()
         timetable.render_today()
     with right:
-        chat.render(inline=True)
+        if store.ai_enabled():
+            chat.render(inline=True)
         todos.render_home()
         daily_log.render_home_habits()
         goals.render_home()
@@ -238,7 +239,7 @@ choice = st.sidebar.radio("Go to", list(PAGES), label_visibility="collapsed", ke
 PAGES[choice]()
 
 # The Claude chat bar, pinned to the bottom of every page (Home has it inline).
-if choice != "Home":
+if choice != "Home" and store.ai_enabled():
     chat.render()
 
 

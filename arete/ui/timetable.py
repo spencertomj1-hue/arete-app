@@ -135,8 +135,9 @@ def _sync_text():
 def render_page():
     day = st.session_state.setdefault("tt_day", date.today())
     monday = day - timedelta(days=day.weekday())
-    # Categories and activity defaults are changed by asking Claude (edit_category,
-    # set_activity_default), so there are no editors under the grid.
+    # Add block / Fit time / Categories: the same things Claude can do, by hand.
+    from arete.ui import timetable_tools
+    timetable_tools.toolbar(day)
     render_grid([monday + timedelta(days=i) for i in range(7)])
 
 

@@ -12,7 +12,7 @@ which re-runs the same tool with confirmed=True (so it re-checks the data).
 
 import re
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Callable
 
 from arete import store
@@ -439,6 +439,17 @@ def _days_between(first, last, weekdays_only):
     return out
 
 
+def _now():
+    """Now in Europe/London, without a timezone (tests replace this)."""
+    return datetime.now(store.TZ).replace(tzinfo=None)
+
+
+def _first_future_slot(day):
+    """The first slot on a timetable day that hasn't started yet (SLOTS if the day is over)."""
+    gone = (_now() - datetime.combine(date.fromisoformat(day), time(7))).total_seconds() / 60
+    return min(store.SLOTS, max(0, -(-int(gone) // 30)))
+
+
 def plan_time(label, hours, start_date, end_date, category=None, earliest="09:00", latest="21:00",
               max_block_hours=2, weekdays_only=False, confirmed=False):
     """
@@ -464,6 +475,9 @@ def plan_time(label, hours, start_date, end_date, category=None, earliest="09:00
     days = _days_between(first_day, last_day, bool(weekdays_only))
     if not days:
         raise ToolError("There are no days in that range (check weekdays_only).")
+    days = [d for d in days if _first_future_slot(d) < hi]           # nothing in the past
+    if not days:
+        raise ToolError("Those days are already over; pick days from today on.")
 
     # If it needs fewer sittings than there are days, try evenly spaced days first
     # (6 h in 2 h sittings over a week: Mon, Wed, Fri rather than Mon, Tue, Wed).
@@ -471,7 +485,7 @@ def plan_time(label, hours, start_date, end_date, category=None, earliest="09:00
     if sittings < len(days):
         spaced = [days[round(i * (len(days) - 1) / max(sittings - 1, 1))] for i in range(sittings)]
         days = list(dict.fromkeys(spaced + days))
-    free = {d: store.free_runs(d, lo, hi) for d in days}
+    free = {d: store.free_runs(d, max(lo, _first_future_slot(d)), hi) for d in days}
     placed = []                                              # (day, start slot, end slot)
     left = need
     while left > 0:
