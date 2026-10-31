@@ -12,3 +12,17 @@ gatherUsageStats = false       # no usage statistics sent to Streamlit
 [client]
 # A desktop app: no Deploy button, developer menu or running indicator.
 toolbarMode = "minimal"
+
+# Colours checked for contrast (WCAG AA, 4.5:1 for text) in each mode. Light / dark /
+# system is chosen in Settings -> Appearance (arete/ui/appearance.py).
+[theme.light]
+primaryColor = "#C62828"       # the accent (Streamlit's default #FF4B4B is only 3.4:1 on white)
+redTextColor = "#C62828"
+orangeTextColor = "#B45309"
+grayTextColor = "#5F6170"
+
+[theme.dark]
+primaryColor = "#FF6B6B"
+redTextColor = "#FF7B72"
+orangeTextColor = "#FBBF24"
+grayTextColor = "#A3A8B8"

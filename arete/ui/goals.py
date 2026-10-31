@@ -209,9 +209,9 @@ def render_home():
       .hg {{ display: grid; gap: 9px; }}
       .hg-top {{ display: flex; align-items: baseline; gap: 8px; font-size: 0.86rem; margin-bottom: 3px; }}
       .hg-title {{ font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-      .hg-when {{ font-size: 0.72rem; opacity: 0.6; white-space: nowrap; }}
+      .hg-when {{ font-size: 0.72rem; opacity: 0.78; white-space: nowrap; }}
       .hg-amount {{ margin-left: auto; display: inline-flex; align-items: center; gap: 4px; opacity: 0.75;
                     font-variant-numeric: tabular-nums; white-space: nowrap; }}
       .hg-row.done .hg-amount {{ color: {accent}; opacity: 1; font-weight: 600; }}
-      .hg-empty {{ opacity: 0.6; font-size: 0.86rem; }}
+      .hg-empty {{ opacity: 0.78; font-size: 0.86rem; }}
     </style><div class="hg">{body}</div>""" + BAR_CSS.replace("ACCENT", accent))

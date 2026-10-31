@@ -68,10 +68,10 @@ def _agenda():
       .ag-row {{ display: flex; align-items: center; gap: 10px; padding: 2px 8px; border-radius: 7px; font-size: 0.86rem; }}
       .ag-row.now {{ background: rgba(128, 128, 128, 0.12); font-weight: 600; }}
       .ag-dot {{ width: 9px; height: 9px; border-radius: 3px; flex: none; }}
-      .ag-time {{ width: 6.5em; flex: none; opacity: 0.7; font-variant-numeric: tabular-nums; }}
+      .ag-time {{ width: 6.5em; flex: none; opacity: 0.8; font-variant-numeric: tabular-nums; }}
       .ag-label {{ min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
       .ag-now {{ margin-left: auto; font-size: 0.72rem; font-weight: 600; color: #ff4b4b; }}
-      .ag-empty {{ opacity: 0.6; font-size: 0.86rem; }}
+      .ag-empty {{ opacity: 0.78; font-size: 0.86rem; }}
       .ag-ol {{ margin-left: 6px; padding: 0 6px; border: 1px solid rgba(128,128,128,.45); border-radius: 999px;
                 font-size: 0.64rem; font-weight: 500; opacity: 0.75; }}
       .ag-chips {{ display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 4px; }}
@@ -211,6 +211,7 @@ st.html(f"""<style>
 from arete.ui import sidebar_theme          # the marble sidebar and its boxed menu
 from arete.ui import appearance             # light / dark / system
 appearance.sync()
+appearance.apply_text_colours()
 sidebar_theme.apply()
 
 

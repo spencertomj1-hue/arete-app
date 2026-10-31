@@ -5,7 +5,7 @@
   --text: var(--st-text-color, #31333f);
   --bg: var(--st-background-color, #fff);
   --head-bg: var(--st-secondary-background-color, #f6f7f9);
-  --muted: rgba(128, 128, 128, 0.95);
+  --muted: color-mix(in srgb, var(--text) 72%, var(--bg));   /* 4.5:1+ on the background in light and dark */
   --accent: var(--st-primary-color, #ff4b4b);
   --radius: var(--st-base-radius, 0.5rem);
   font: inherit;
@@ -58,7 +58,7 @@ button { font: inherit; color: inherit; }
 .cell:nth-child(7n + 7) { border-right: none; }        /* last column (7 headers come first) */
 .cell:nth-last-child(-n + 7) { border-bottom: none; }  /* last row */
 .cell:hover { background: rgba(128, 128, 128, 0.08); }
-.cell.other { opacity: 0.4; }
+.cell.other .num, .cell.other .stat { color: var(--muted); font-weight: 500; }   /* faded but still 4.5:1 */
 .cell.future .stats { display: none; }
 .cell.selected { background: rgba(128, 128, 128, 0.14); box-shadow: inset 0 0 0 2px var(--accent); }
 
@@ -76,7 +76,7 @@ button { font: inherit; color: inherit; }
   color: var(--muted);
 }
 .stat svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.stat.mood { color: var(--c, var(--muted)); font-weight: 600; }
+.stat.mood { color: color-mix(in srgb, var(--c, var(--muted)) 50%, var(--text)); font-weight: 600; }   /* readable in both modes */
 .stat.sleep svg { fill: currentColor; stroke: none; }
 .stat.energy svg { fill: currentColor; stroke: none; }
 .stat.water svg { fill: currentColor; stroke: none; }

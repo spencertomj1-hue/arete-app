@@ -46,7 +46,7 @@ def render_home():
       .dl-when {{ margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; opacity: 0.8; }}
       .dl-row.soon .dl-when {{ color: {soon}; opacity: 1; font-weight: 600; }}
       .dl-row.over .dl-when {{ color: {over}; opacity: 1; font-weight: 600; }}
-      .dl-more {{ opacity: 0.7; font-size: 0.8rem; }}
+      .dl-more {{ opacity: 0.8; font-size: 0.8rem; }}
     </style><div class="dl">{items}{more}</div>""")
 
 

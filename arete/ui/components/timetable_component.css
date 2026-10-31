@@ -7,7 +7,7 @@
   --text: var(--st-text-color, #31333f);
   --bg: var(--st-background-color, #fff);
   --head-bg: var(--st-secondary-background-color, #f6f7f9);
-  --muted: rgba(128, 128, 128, 0.95);
+  --muted: color-mix(in srgb, var(--text) 72%, var(--bg));   /* 4.5:1+ on the background in light and dark */
   --accent: var(--st-primary-color, #ff4b4b);
   --radius: var(--st-base-radius, 0.5rem);
   font: inherit;
@@ -267,7 +267,7 @@ td.s.sel { background: color-mix(in srgb, var(--accent) 22%, transparent); }
   background: transparent; color: var(--text); cursor: pointer;
 }
 .tt-sync { width: 28px; height: 28px; justify-content: center; padding: 0; }
-.tt-ol-toggle { padding: 3px 10px; font-size: 0.75rem; opacity: 0.55; }
+.tt-ol-toggle { padding: 3px 10px; font-size: 0.75rem; opacity: 0.8; }
 .tt-ol-toggle.on { opacity: 1; background: rgba(128, 128, 128, 0.12); }
 .tt-sync:hover, .tt-ol-toggle:hover { background: rgba(128, 128, 128, 0.1); }
 .msr {   /* Streamlit's Material Symbols font, loaded on the page */

@@ -51,6 +51,15 @@ def is_dark():
         return False
 
 
+def apply_text_colours():
+    """Streamlit's captions are 60% text colour (3.7:1 on white); make them 4.5:1+ in either mode."""
+    caption = "#A3A8B8" if is_dark() else "#5F6170"
+    st.html(f"""<style>
+    [data-testid="stCaptionContainer"] {{ opacity: 1 !important; }}
+    [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {{ color: {caption} !important; }}
+    </style>""")
+
+
 def warn_colours():
     """(soon, overdue) text colours readable on the current background."""
     return ("#fbbf24", "#ff7b72") if is_dark() else ("#b45309", "#c62828")

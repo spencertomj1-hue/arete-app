@@ -5,7 +5,7 @@
   --bg: var(--st-background-color, #fff);
   --soft: var(--st-secondary-background-color, #f3f4f6);
   --line: rgba(128, 128, 128, 0.28);
-  --muted: rgba(128, 128, 128, 0.95);
+  --muted: color-mix(in srgb, var(--text) 72%, var(--bg));   /* 4.5:1+ on the background in light and dark */
   --accent: var(--st-primary-color, #ff4b4b);
   font: inherit;
   color: var(--text);
